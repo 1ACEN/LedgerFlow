@@ -181,34 +181,76 @@ make typecheck     # mypy + tsc
 
 ```
 ledgerflow/
-├── .github/workflows/        # CI (test, lint, typecheck) + CD (deploy)
+│
+├── .github/
+│   └── workflows/
+│       └── ci.yml                    # CI: lint → typecheck → test → deploy
+│
 ├── docker/
-│   ├── Dockerfile            # Multi-stage: builder → slim runtime
-│   └── docker-entrypoint.sh
-├── evidence/                 # Evidence.dev dashboard app
-│   ├── sources/              # SQL source definitions (DuckDB)
-│   ├── pages/                # Markdown dashboard pages (/ops, /cashflow, /cfo)
-│   └── components/           # Custom Svelte/React components
-├── scripts/
-│   ├── generate_synthetic.py # Synthetic data generator (50k+ transactions)
-│   ├── init_db.py            # Schema initialisation
-│   ├── migrate.py            # Schema migrations
-│   ├── ingest_stripe.py      # Stripe webhook ingestion
-│   ├── ingest_plaid.py       # Plaid bank feed ingestion
-│   ├── reconcile.py          # Nightly reconciliation
-│   ├── train_forecast.py     # Cash flow ML training
-│   ├── train_retry.py        # Decline-retry ML training
-│   ├── predict_cashflow.py   # Batch cash flow inference
-│   └── health_check.py       # Readiness / liveness probe
-├── models/                   # Trained .joblib artifacts (gitignored)
-├── data/                     # DuckDB file (gitignored)
+│   ├── Dockerfile                    # Multi-stage build (builder → slim runtime)
+│   ├── docker-entrypoint.sh          # Container startup logic
+│   └── crontab                       # Cron schedules (nightly ingest, weekly retrain)
+│
+├── evidence/                         # Evidence.dev dashboard app
+│   ├── sources/
+│   │   └── ledgerflow/               # DuckDB source (connection.yaml + SQL views)
+│   │       ├── connection.yaml       # DuckDB connection config
+│   │       ├── transactions.sql      # Raw transaction ledger
+│   │       ├── daily_cash_position.sql
+│   │       ├── success_rate_daily.sql
+│   │       ├── decline_analysis.sql
+│   │       ├── decline_predictions.sql
+│   │       ├── disputes.sql
+│   │       ├── ar_aging.sql
+│   │       ├── forecasts.sql
+│   │       ├── monthly_pl.sql
+│   │       ├── revenue_by_product.sql
+│   │       ├── customers.sql
+│   │       └── merchants.sql
+│   ├── pages/
+│   │   ├── index.md                  # Landing / overview
+│   │   ├── ops.md                    # /ops  — Fintech ops dashboard
+│   │   ├── cashflow.md               # /cashflow — ML cash forecast
+│   │   └── cfo.md                    # /cfo  — FP&A / CFO view
+│   ├── evidence.config.yaml          # Evidence app config
+│   ├── package.json                  # Node deps (Evidence, vitest)
+│   └── tsconfig.json
+│
+├── scripts/                          # Python pipeline scripts
+│   │
+│   ├── # ── Database ─────────────────────────────────────────
+│   ├── init_db.py                    # Initialise DuckDB schema
+│   ├── migrate.py                    # Schema migrations
+│   │
+│   ├── # ── Ingestion ────────────────────────────────────────
+│   ├── ingest_stripe.py              # Stripe webhook → ledger
+│   ├── ingest_plaid.py               # Plaid bank feed → ledger
+│   ├── reconcile.py                  # Nightly reconciliation
+│   │
+│   ├── # ── ML ──────────────────────────────────────────────
+│   ├── train_forecast.py             # Train LightGBM quantile regression
+│   ├── train_retry.py                # Train XGBoost decline-retry classifier
+│   ├── predict_cashflow.py           # Batch cash flow inference
+│   │
+│   ├── # ── Dev / Ops ────────────────────────────────────────
+│   ├── generate_synthetic.py         # Generate 50k+ synthetic transactions
+│   └── health_check.py               # Readiness / liveness probe
+│
 ├── tests/
-│   ├── unit/
-│   └── integration/
-├── pyproject.toml            # Python deps + tool config (uv / ruff / mypy)
-├── fly.toml                  # Fly.io deployment config
-├── Makefile                  # All dev, test, build, deploy commands
-└── .env.example              # Environment variable reference
+│   └── unit/
+│       ├── test_generate_synthetic.py
+│       ├── test_ml.py
+│       └── test_schema.py
+│
+├── models/                           # Trained .joblib artifacts (gitignored)
+├── data/                             # DuckDB file (gitignored)
+│
+├── pyproject.toml                    # Python deps + ruff / mypy / pytest config
+├── fly.toml                          # Fly.io deployment config
+├── docker-compose.yml                # Local multi-service dev compose
+├── Makefile                          # All dev, test, build, deploy targets
+├── .env.example                      # Environment variable reference
+└── .gitignore
 ```
 
 ---
