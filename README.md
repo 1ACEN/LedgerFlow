@@ -184,18 +184,18 @@ ledgerflow/
 │
 ├── .github/
 │   └── workflows/
-│       └── ci.yml                    # CI: lint → typecheck → test → deploy
+│       └── ci.yml                      # CI: lint → typecheck → test → deploy
 │
 ├── docker/
-│   ├── Dockerfile                    # Multi-stage build (builder → slim runtime)
-│   ├── docker-entrypoint.sh          # Container startup logic
-│   └── crontab                       # Cron schedules (nightly ingest, weekly retrain)
+│   ├── Dockerfile                      # Multi-stage build (builder → slim runtime)
+│   ├── docker-entrypoint.sh            # Container startup logic
+│   └── crontab                         # Cron schedules (nightly ingest, weekly retrain)
 │
-├── evidence/                         # Evidence.dev dashboard app
+├── evidence/                           # Evidence.dev dashboard app
 │   ├── sources/
-│   │   └── ledgerflow/               # DuckDB source (connection.yaml + SQL views)
-│   │       ├── connection.yaml       # DuckDB connection config
-│   │       ├── transactions.sql      # Raw transaction ledger
+│   │   └── ledgerflow/                 # DuckDB source (connection.yaml + SQL views)
+│   │       ├── connection.yaml         # DuckDB connection config
+│   │       ├── transactions.sql        # Raw transaction ledger
 │   │       ├── daily_cash_position.sql
 │   │       ├── success_rate_daily.sql
 │   │       ├── decline_analysis.sql
@@ -208,48 +208,52 @@ ledgerflow/
 │   │       ├── customers.sql
 │   │       └── merchants.sql
 │   ├── pages/
-│   │   ├── index.md                  # Landing / overview
-│   │   ├── ops.md                    # /ops  — Fintech ops dashboard
-│   │   ├── cashflow.md               # /cashflow — ML cash forecast
-│   │   └── cfo.md                    # /cfo  — FP&A / CFO view
-│   ├── evidence.config.yaml          # Evidence app config
-│   ├── package.json                  # Node deps (Evidence, vitest)
+│   │   ├── index.md                    # Landing / overview
+│   │   ├── ops.md                      # /ops      — Fintech ops dashboard
+│   │   ├── cashflow.md                 # /cashflow — ML cash forecast
+│   │   └── cfo.md                      # /cfo      — FP&A / CFO view
+│   ├── evidence.config.yaml            # Evidence app config
+│   ├── package.json                    # Node deps (Evidence, vitest)
 │   └── tsconfig.json
 │
-├── scripts/                          # Python pipeline scripts
+├── scripts/                            # Python pipeline — grouped by responsibility
+│   ├── db/                             # Database management
+│   │   ├── __init__.py
+│   │   ├── init_db.py                  # Initialise DuckDB schema
+│   │   └── migrate.py                  # Schema migrations
 │   │
-│   ├── # ── Database ─────────────────────────────────────────
-│   ├── init_db.py                    # Initialise DuckDB schema
-│   ├── migrate.py                    # Schema migrations
+│   ├── ingestion/                      # Data ingestion & reconciliation
+│   │   ├── __init__.py
+│   │   ├── ingest_stripe.py            # Stripe webhooks → ledger
+│   │   ├── ingest_plaid.py             # Plaid bank feeds → ledger
+│   │   └── reconcile.py               # Nightly reconciliation
 │   │
-│   ├── # ── Ingestion ────────────────────────────────────────
-│   ├── ingest_stripe.py              # Stripe webhook → ledger
-│   ├── ingest_plaid.py               # Plaid bank feed → ledger
-│   ├── reconcile.py                  # Nightly reconciliation
+│   ├── ml/                             # Machine learning
+│   │   ├── __init__.py
+│   │   ├── train_forecast.py           # Train LightGBM quantile regression
+│   │   ├── train_retry.py              # Train XGBoost decline-retry classifier
+│   │   └── predict_cashflow.py        # Batch cash flow inference
 │   │
-│   ├── # ── ML ──────────────────────────────────────────────
-│   ├── train_forecast.py             # Train LightGBM quantile regression
-│   ├── train_retry.py                # Train XGBoost decline-retry classifier
-│   ├── predict_cashflow.py           # Batch cash flow inference
-│   │
-│   ├── # ── Dev / Ops ────────────────────────────────────────
-│   ├── generate_synthetic.py         # Generate 50k+ synthetic transactions
-│   └── health_check.py               # Readiness / liveness probe
+│   └── utils/                          # Dev tooling & ops
+│       ├── __init__.py
+│       ├── generate_synthetic.py       # Generate 50k+ synthetic transactions
+│       └── health_check.py             # Readiness / liveness probe
 │
 ├── tests/
-│   └── unit/
-│       ├── test_generate_synthetic.py
-│       ├── test_ml.py
-│       └── test_schema.py
+│   ├── unit/
+│   │   ├── test_generate_synthetic.py
+│   │   ├── test_ml.py
+│   │   └── test_schema.py
+│   └── integration/
 │
-├── models/                           # Trained .joblib artifacts (gitignored)
-├── data/                             # DuckDB file (gitignored)
+├── models/                             # Trained .joblib artifacts (gitignored)
+├── data/                               # DuckDB file (gitignored)
 │
-├── pyproject.toml                    # Python deps + ruff / mypy / pytest config
-├── fly.toml                          # Fly.io deployment config
-├── docker-compose.yml                # Local multi-service dev compose
-├── Makefile                          # All dev, test, build, deploy targets
-├── .env.example                      # Environment variable reference
+├── pyproject.toml                      # Python deps + ruff / mypy / pytest config
+├── fly.toml                            # Fly.io deployment config
+├── docker-compose.yml                  # Local multi-service dev compose
+├── Makefile                            # All dev, test, build, deploy targets
+├── .env.example                        # Environment variable reference
 └── .gitignore
 ```
 
