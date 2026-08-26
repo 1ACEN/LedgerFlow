@@ -9,23 +9,18 @@
     "build": "evidence build",
     "serve": "evidence serve",
     "test": "vitest run",
-    "lint": "eslint . --ext .js,.ts,.svelte,.cjs --no-error-on-unmatched-pattern",
+    "lint": "eslint . --ext .js,.ts,.svelte",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@evidence-dev/evidence": "^40.1.8",
     "@evidence-dev/core-components": "^5.4.2",
     "@evidence-dev/duckdb": "^2.0.1",
-    "@evidence-dev/evidence": "^40.1.8",
     "duckdb-async": "^1.0.0"
   },
   "devDependencies": {
-    "@sveltejs/vite-plugin-svelte": "^3.1.2",
     "@types/node": "^20.0.0",
-    "autoprefixer": "^10.5.4",
     "eslint": "^8.56.0",
-    "git-remote-origin-url": "^4.0.0",
-    "postcss": "^8.5.26",
-    "tailwindcss": "^3.4.19",
     "typescript": "^5.3.0",
     "vitest": "^1.0.0"
   },
