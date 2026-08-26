@@ -1,0 +1,116 @@
+[project]
+name = "ledgerflow"
+version = "0.1.0"
+description = "Financial observability platform: unified ledger, cash forecasting, ML-powered dashboards"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Your Name", email = "you@example.com"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial",
+]
+dependencies = [
+    # Data & DB
+    "duckdb>=1.0",
+    "polars>=1.0",          # Fast DataFrame ops
+    "pyarrow>=15.0",        # Arrow integration for polars/duckdb
+    "pandas>=2.2",          # Compatibility layer
+    "numpy>=1.26",
+    # ML
+    "lightgbm>=4.3",
+    "xgboost>=2.1",
+    "scikit-learn>=1.4",
+    "joblib>=1.4",
+    # Stripe / Plaid
+    "stripe>=8.0",
+    "plaid-python>=16.0",
+    # Web API (for live webhooks)
+    "fastapi>=0.109",
+    "uvicorn[standard]>=0.27",
+    "pydantic>=2.6",
+    "pydantic-settings>=2.2",
+    # Config & Utils
+    "python-dotenv>=1.0",
+    "pyyaml>=6.0",
+    "tqdm>=4.66",
+    "rich>=13.7",
+    "typer>=0.12",
+    "apscheduler>=3.10",
+    "faker>=24.0",
+    # Testing
+    "pytest>=8.0",
+    "pytest-cov>=4.1",
+    "pytest-mock>=3.12",
+    "hypothesis>=6.98",
+    "pytz>=2026.3.post1",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.4",
+    "mypy>=1.9",
+    "pre-commit>=3.6",
+    "sqlfluff>=3.0",
+    "ipykernel>=6.29",
+    "jupyter>=1.0",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM"]
+ignore = ["E501", "B008"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "lf"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+strict_optional = true
+show_error_codes = true
+pretty = true
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short --strict-markers"
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "slow: Slow tests",
+]
+
+[tool.coverage.run]
+source = ["scripts/db", "scripts/ingestion", "scripts/ml", "scripts/utils"]
+omit = ["tests/*"]
+
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]

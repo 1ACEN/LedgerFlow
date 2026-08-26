@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # LedgerFlow application container
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: runtime
+    container_name: ledgerflow-app
+    ports:
+      - "3000:3000"
+    environment:
+      - DUCKDB_PATH=/data/ledgerflow.duckdb
+      - MODEL_REGISTRY_PATH=/models/
+      - GENERATE_SYNTHETIC=true
+      - LOG_LEVEL=INFO
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+      - PLAID_CLIENT_ID=${PLAID_CLIENT_ID:-}
+      - PLAID_SECRET=${PLAID_SECRET:-}
+      - PLAID_ENV=${PLAID_ENV:-sandbox}
+      - PLAID_ACCESS_TOKENS=${PLAID_ACCESS_TOKENS:-}
+    volumes:
+      - ledgerflow_data:/data
+      - ledgerflow_models:/models
+      - ./evidence:/app/evidence:ro  # Mount for hot reload in dev
+      - ./scripts:/app/scripts:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # Optional: PostgreSQL for production-like testing
+  # postgres:
+  #   image: postgres:16-alpine
+  #   container_name: ledgerflow-postgres
+  #   environment:
+  #     POSTGRES_DB: ledgerflow
+  #     POSTGRES_USER: ledgerflow
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ledgerflow}
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - ledgerflow_pgdata:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U ledgerflow"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+volumes:
+  ledgerflow_data:
+  ledgerflow_models:
+  # ledgerflow_pgdata:

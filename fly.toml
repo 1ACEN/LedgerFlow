@@ -1,0 +1,71 @@
+# LedgerFlow Fly.io Configuration
+# Deploy with: fly deploy
+
+app = "ledgerflow"
+primary_region = "iad"
+
+[build]
+  dockerfile = "docker/Dockerfile"
+
+[env]
+  PORT = "3000"
+  PYTHONUNBUFFERED = "1"
+  DUCKDB_PATH = "/data/ledgerflow.duckdb"
+  MODEL_REGISTRY_PATH = "/models/"
+
+# HTTP service - Evidence.dev dashboard
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "10s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/health"
+
+# Persistent volume for DuckDB + models
+[mounts]
+  source = "ledgerflow_data"
+  destination = "/data"
+
+  source = "ledgerflow_models"
+  destination = "/models"
+
+# VM sizing (hobby tier)
+[vm]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+# Scaling
+[[services]]
+  protocol = "tcp"
+  internal_port = 3000
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+    force_https = true
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+# Health checks
+[checks]
+  [checks.http]
+    interval = "30s"
+    timeout = "10s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/health"
+
+# Release command (runs before new version gets traffic)
+[deploy]
+  release_command = "python scripts/migrate.py --db $DUCKDB_PATH"
+  strategy = "rolling"

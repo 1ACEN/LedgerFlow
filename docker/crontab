@@ -1,0 +1,27 @@
+# LedgerFlow Cron Jobs
+# Runs inside the container as the ledgerflow user
+# All times in UTC
+
+# Environment variables for cron jobs
+DUCKDB_PATH=/data/ledgerflow.duckdb
+MODEL_REGISTRY_PATH=/models/
+PYTHONPATH=/app
+
+# Nightly at 2:30 AM UTC - Ingest new data from Stripe/Plaid
+30 2 * * * /usr/local/bin/python /app/scripts/ingestion/ingest_stripe.py --db $DUCKDB_PATH >> /var/log/ledgerflow/ingest_stripe.log 2>&1
+35 2 * * * /usr/local/bin/python /app/scripts/ingestion/ingest_plaid.py --db $DUCKDB_PATH >> /var/log/ledgerflow/ingest_plaid.log 2>&1
+
+# Nightly at 3:00 AM UTC - Reconciliation
+0 3 * * * /usr/local/bin/python /app/scripts/ingestion/reconcile.py --db $DUCKDB_PATH >> /var/log/ledgerflow/reconcile.log 2>&1
+
+# Weekly on Sunday 3:30 AM UTC - Retrain ML models
+30 3 * * 0 /usr/local/bin/python /app/scripts/ml/train_forecast.py --db $DUCKDB_PATH --output $MODEL_REGISTRY_PATH/cash_forecast.joblib >> /var/log/ledgerflow/train_forecast.log 2>&1
+45 3 * * 0 /usr/local/bin/python /app/scripts/ml/train_retry.py --db $DUCKDB_PATH --output $MODEL_REGISTRY_PATH/decline_retry.joblib >> /var/log/ledgerflow/train_retry.log 2>&1
+
+# Daily at 6:00 AM UTC - Generate daily cash forecast predictions
+0 6 * * * /usr/local/bin/python /app/scripts/ml/predict_cashflow.py --db $DUCKDB_PATH --model $MODEL_REGISTRY_PATH/cash_forecast.joblib >> /var/log/ledgerflow/predict_cashflow.log 2>&1
+
+# Every 15 minutes - Health check / metric emission
+*/15 * * * * /usr/local/bin/python /app/scripts/utils/health_check.py --db $DUCKDB_PATH >> /var/log/ledgerflow/health.log 2>&1
+
+# Empty line required at end of crontab
