@@ -9,7 +9,7 @@
     "build": "evidence build",
     "serve": "evidence serve",
     "test": "vitest run",
-    "lint": "eslint . --ext .js,.ts",
+    "lint": "eslint . --ext .js,.ts --no-error-on-unmatched-pattern",
     "typecheck": "svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
