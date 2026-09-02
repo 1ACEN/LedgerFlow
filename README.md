@@ -1,6 +1,6 @@
 # LedgerFlow
 
-> **Financial observability for modern finance teams** — unified payment operations, ML-powered cash forecasting, and FP&A views on a single transaction ledger.
+> **Financial observability for modern finance teams** — unified payment operations, ML-powered cash forecasting, and FP&A views in a single live dashboard.
 
 [![CI](https://github.com/yourusername/ledgerflow/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/ledgerflow/actions/workflows/ci.yml)
 [![Deploy](https://github.com/yourusername/ledgerflow/actions/workflows/deploy.yml/badge.svg)](https://github.com/yourusername/ledgerflow/actions/workflows/deploy.yml)
@@ -11,14 +11,15 @@
 
 ## What it does
 
-LedgerFlow ingests transactions from Stripe and bank feeds (via Plaid), normalises them into a unified ledger in DuckDB, and serves three Evidence.dev dashboards tailored to each finance audience:
+LedgerFlow ingests transactions from Stripe and bank feeds (via Plaid), normalises them into a unified ledger in DuckDB, and serves **one unified FastAPI dashboard** combining live streaming with the full BI suite:
 
 | Layer | Capability |
 |---|---|
 | **Ingestion** | Stripe webhooks + Plaid bank feeds → normalised transaction ledger |
-| **Fintech Ops** | Real-time payment success rates, decline-code analysis, payout tracking, dispute monitoring |
-| **Cash Flow** | Daily net position, 13-week forecast with ML prediction intervals (P10/P50/P90), collections ageing |
-| **CFO / FP&A** | Monthly P&L, variance vs. budget, burn rate, runway, and revenue waterfall |
+| **Live Pipeline** | Real-time streaming feed, manual transaction entry, gateway/webhook health |
+| **Fintech Ops** | Payment success rates, decline-code analysis, AI retry advisor, payout tracking, dispute monitoring |
+| **Cash Flow** | Daily net position, 13-week forecast with ML prediction intervals (P10/P50/P90), AR aging |
+| **CFO / FP&A** | Monthly P&L, revenue by product line, cash burn, runway |
 | **ML** | LightGBM quantile regression for cash forecasting; XGBoost decline-retry advisor |
 | **Deploy** | Single-container Fly.io deployment with persistent volume, cron jobs, and secrets management |
 
@@ -27,25 +28,27 @@ LedgerFlow ingests transactions from Stripe and bank feeds (via Plaid), normalis
 ## Architecture
 
 ```
-┌─────────────┐     ┌──────────────┐     ┌─────────────────┐     ┌──────────────────┐
-│  Stripe     │     │              │     │   DuckDB /      │     │  Evidence.dev    │
-│  Webhooks   │────▶│  Ingestion   │────▶│   Postgres      │────▶│  Dashboards      │
-│  Plaid Feeds│     │  (Python)    │     │   (Ledger)      │     │  (Static Site)   │
-└─────────────┘     └──────────────┘     └────────┬────────┘     └──────────────────┘
-                                                  │
-                    ┌─────────────────────────────┼─────────────────────────────┐
-                    ▼                             ▼                             ▼
-           ┌─────────────────┐           ┌─────────────────┐           ┌─────────────────┐
-           │  /ops           │           │   /cashflow     │           │    /cfo         │
-           │  Fintech Ops    │           │  ML Forecast    │           │  FP&A Views     │
-           │  (Real-time)    │           │  (Daily cron)   │           │  (Monthly)      │
-           └─────────────────┘           └─────────────────┘           └─────────────────┘
+┌─────────────┐     ┌──────────────┐     ┌─────────────────┐     ┌────────────────────────────┐
+│  Stripe     │     │              │     │   DuckDB /      │     │   FastAPI Unified          │
+│  Webhooks   │────▶│  Ingestion   │────▶│   Postgres      │────▶│   Dashboard (single app)  │
+│  Plaid Feeds│     │  (Python)    │     │   (Ledger)      │     │   · Live Pipeline         │
+└─────────────┘     └──────────────┘     └────────┬────────┘     │   · Executive Overview     │
+                                                  │              │   · Cash Flow & Forecast   │
+                                                  │              │   · CFO & Revenue          │
+                                                  │              │   · Ops & AI Advisor       │
+                                                  │              │   · AR Aging               │
+                                                  ▼              └────────────────────────────┘
+                                            ┌─────────────────────────────┐
+                                            │   Nightly cron (cron job):  │
+                                            │   ingest → reconcile →      │
+                                            │   retrain ML → predict      │
+                                            └─────────────────────────────┘
 ```
 
 **Key design decisions:**
 - **DuckDB** — embedded OLAP engine; no separate database server required locally
 - **Polars** — fast in-process DataFrame transforms before writing to DuckDB
-- **Evidence.dev** — SQL-driven dashboards that compile to a static site (zero runtime overhead)
+- **Single FastAPI dashboard** — one Python process serves the live streaming feed (SSE-style polling), manual transaction entry, Stripe/Plaid webhooks, and all BI tabs from the same origin
 - **uv** — fast, reproducible Python dependency management
 
 ---
@@ -56,8 +59,7 @@ LedgerFlow ingests transactions from Stripe and bank feeds (via Plaid), normalis
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| Python | 3.11+ | Ingestion, ML, scripts |
-| Node.js | 20+ | Evidence.dev dashboards |
+| Python | 3.11+ | Ingestion, ML, dashboard, scripts |
 | uv | latest | Python package manager (`curl -LsSf https://astral.sh/uv/install.sh \| sh`) |
 | Docker | any | Production image |
 | flyctl | latest | Fly.io deployment |
@@ -68,7 +70,7 @@ LedgerFlow ingests transactions from Stripe and bank feeds (via Plaid), normalis
 git clone https://github.com/yourusername/ledgerflow.git
 cd ledgerflow
 
-# Install Python + Node dependencies
+# Install Python dependencies
 make install
 ```
 
@@ -86,7 +88,7 @@ cp .env.example .env
 make dev
 ```
 
-Opens **Evidence.dev** at `http://localhost:3000` with hot-reload enabled.
+Opens the **unified dashboard** at `http://localhost:8080` with a live streaming feed (synthetic transactions every few seconds), manual transaction entry, and all BI tabs.
 
 ### 4. (Optional) Train ML models
 
@@ -103,16 +105,14 @@ make train
 make help            # Show this list
 
 # Development
-make dev             # Generate data + start Evidence dashboard (port 3000)
+make dev             # Generate data + start unified dashboard (port 8080)
 make generate-data   # Generate 50k synthetic transactions into DuckDB
 make train           # Train both ML models
 
 # Testing & quality
-make test            # Run all Python + JS tests
-make test-python     # pytest (unit + integration)
-make test-js         # vitest (Evidence components)
-make lint            # Ruff + ESLint + SQLFluff
-make typecheck       # mypy + tsc
+make test            # Run all Python tests
+make lint            # Ruff check
+make typecheck       # mypy type checking
 
 # Database
 make db-init         # Initialise DuckDB schema
@@ -165,14 +165,16 @@ make deploy
 | Cron — retrain | Weekly ML model retrain |
 | TLS | `fly certs add yourdomain.com` |
 
+Production runs with `DEMO_MODE=false` — the dashboard reflects only real ingested data (webhooks + nightly pulls).
+
 ---
 
 ## Testing
 
 ```bash
-make test          # Unit + integration tests (pytest + vitest)
-make lint          # Ruff + ESLint + SQLFluff
-make typecheck     # mypy + tsc
+make test          # Unit + integration tests (pytest)
+make lint          # Ruff
+make typecheck     # mypy
 ```
 
 ---
@@ -184,55 +186,35 @@ ledgerflow/
 │
 ├── .github/
 │   └── workflows/
-│       └── ci.yml                      # CI: lint → typecheck → test → deploy
+│       └── ci.yml                      # CI: lint → typecheck → test → security scan
 │
 ├── docker/
-│   ├── Dockerfile                      # Multi-stage build (builder → slim runtime)
+│   ├── Dockerfile                      # Single-stage runtime image (Python)
 │   ├── docker-entrypoint.sh            # Container startup logic
 │   └── crontab                         # Cron schedules (nightly ingest, weekly retrain)
 │
-├── evidence/                           # Evidence.dev dashboard app
-│   ├── sources/
-│   │   └── ledgerflow/                 # DuckDB source (connection.yaml + SQL views)
-│   │       ├── connection.yaml         # DuckDB connection config
-│   │       ├── transactions.sql        # Raw transaction ledger
-│   │       ├── daily_cash_position.sql
-│   │       ├── success_rate_daily.sql
-│   │       ├── decline_analysis.sql
-│   │       ├── decline_predictions.sql
-│   │       ├── disputes.sql
-│   │       ├── ar_aging.sql
-│   │       ├── forecasts.sql
-│   │       ├── monthly_pl.sql
-│   │       ├── revenue_by_product.sql
-│   │       ├── customers.sql
-│   │       └── merchants.sql
-│   ├── pages/
-│   │   ├── index.md                    # Landing / overview
-│   │   ├── ops.md                      # /ops      — Fintech ops dashboard
-│   │   ├── cashflow.md                 # /cashflow — ML cash forecast
-│   │   └── cfo.md                      # /cfo      — FP&A / CFO view
-│   ├── evidence.config.yaml            # Evidence app config
-│   ├── package.json                    # Node deps (Evidence, vitest)
-│   └── tsconfig.json
-│
 ├── scripts/                            # Python pipeline — grouped by responsibility
+│   ├── api/                            # The unified dashboard backend
+│   │   ├── __init__.py
+│   │   ├── webhooks.py                 # FastAPI: serves dashboard + webhooks + live API
+│   │   └── live_input.html             # Single-page unified dashboard (6 tabs)
+│   │
 │   ├── db/                             # Database management
 │   │   ├── __init__.py
-│   │   ├── init_db.py                  # Initialise DuckDB schema
+│   │   ├── init_db.py                  # Initialise DuckDB schema (incl. analytics views)
 │   │   └── migrate.py                  # Schema migrations
 │   │
 │   ├── ingestion/                      # Data ingestion & reconciliation
 │   │   ├── __init__.py
 │   │   ├── ingest_stripe.py            # Stripe webhooks → ledger
 │   │   ├── ingest_plaid.py             # Plaid bank feeds → ledger
-│   │   └── reconcile.py               # Nightly reconciliation
+│   │   └── reconcile.py                # Nightly reconciliation
 │   │
 │   ├── ml/                             # Machine learning
 │   │   ├── __init__.py
 │   │   ├── train_forecast.py           # Train LightGBM quantile regression
 │   │   ├── train_retry.py              # Train XGBoost decline-retry classifier
-│   │   └── predict_cashflow.py        # Batch cash flow inference
+│   │   └── predict_cashflow.py         # Batch cash flow inference
 │   │
 │   └── utils/                          # Dev tooling & ops
 │       ├── __init__.py
@@ -242,6 +224,7 @@ ledgerflow/
 ├── tests/
 │   ├── unit/
 │   │   ├── test_generate_synthetic.py
+│   │   ├── test_live_input.py
 │   │   ├── test_ml.py
 │   │   └── test_schema.py
 │   └── integration/
@@ -251,7 +234,7 @@ ledgerflow/
 │
 ├── pyproject.toml                      # Python deps + ruff / mypy / pytest config
 ├── fly.toml                            # Fly.io deployment config
-├── docker-compose.yml                  # Local multi-service dev compose
+├── docker-compose.yml                  # Local single-service dev compose
 ├── Makefile                            # All dev, test, build, deploy targets
 ├── .env.example                        # Environment variable reference
 └── .gitignore
@@ -276,6 +259,9 @@ Copy `.env.example` → `.env` for local development. No API keys are required w
 | `DUCKDB_PATH` | Local | DuckDB file path (default: `data/ledgerflow.duckdb`) |
 | `MODEL_REGISTRY_PATH` | All | Directory for trained model artifacts (default: `models/`) |
 | `GENERATE_SYNTHETIC` | Dev only | Auto-generate data on container start (`true`/`false`) |
+| `WEBHOOK_PORT` | All | Port the unified dashboard listens on (default: `8080`) |
+| `DEMO_MODE` | Dev only | Stream synthetic demo transactions on startup (`true`/`false`, default `true`) |
+| `DEMO_INTERVAL_SEC` | Dev only | Seconds between demo transactions (default: `4`) |
 | `SENTRY_DSN` | Optional | Sentry error-tracking DSN |
 | `SLACK_WEBHOOK_URL` | Optional | Slack webhook URL for operational alerts |
 | `LOG_LEVEL` | All | Logging verbosity (`DEBUG`, `INFO`, `WARNING`) |
@@ -284,13 +270,20 @@ Copy `.env.example` → `.env` for local development. No API keys are required w
 
 ---
 
-## Dashboard Pages
+## Dashboard — Unified View
 
-| Route | Audience | Data freshness |
-|-------|----------|----------------|
-| `/ops` | Payments engineers, risk team | Real-time (webhook-driven) |
-| `/cashflow` | Treasurer, controller | Daily (nightly cron) |
-| `/cfo` | CFO, CEO, board | Monthly (manual refresh) |
+One dashboard at `http://localhost:8080` with tabbed views covering every finance audience:
+
+| Tab | Audience | Data freshness |
+|-----|----------|----------------|
+| ⚡ Live Pipeline | Payments engineers, risk team | Real-time (webhook-driven) |
+| 📈 Executive Overview | CFO, CEO, board | Daily |
+| 🔮 Cash Flow & Forecast | Treasurer, controller | Daily (nightly cron) |
+| 📊 CFO & Revenue | CFO, FP&A | Monthly |
+| 🛡️ Fintech Ops & AI | Payments engineers, risk team | Real-time |
+| 📑 AR Aging | Collections / finance | Daily |
+
+It also provides a **manual transaction input form** and a **live streaming feed**, plus a REST API (`/docs` for OpenAPI docs) for webhooks and reports.
 
 ---
 
@@ -309,8 +302,8 @@ Copy `.env.example` → `.env` for local development. No API keys are required w
 
 ## Resume Bullet
 
-> **LedgerFlow** — *Python · DuckDB · Polars · Evidence.dev · LightGBM · XGBoost · Fly.io · GitHub Actions*
-> Built a deployable financial observability platform ingesting Stripe + Plaid bank feeds into a unified ledger; shipped real-time payments ops dashboard, 13-week ML cash forecast with prediction intervals (quantile regression), and CFO variance views; automated nightly reconciliation and weekly model retraining via CI/CD on Fly.io.
+> **LedgerFlow** — *Python · DuckDB · Polars · FastAPI · LightGBM · XGBoost · Fly.io · GitHub Actions*
+> Built a deployable financial observability platform ingesting Stripe + Plaid bank feeds into a unified ledger; shipped a single unified dashboard combining a real-time streaming pipeline, manual transaction input, ML 13-week cash forecast with prediction intervals (quantile regression), CFO variance views, and decline-retry advisor; automated nightly reconciliation and weekly model retraining via CI/CD on Fly.io.
 
 ---
 
@@ -320,7 +313,7 @@ Copy `.env.example` → `.env` for local development. No API keys are required w
 - [ ] ERP integrations (NetSuite, QuickBooks Online)
 - [ ] Anomaly detection on transaction volume (Isolation Forest)
 - [ ] Dispute / fraud prediction pre-authorisation
-- [ ] Embeddable custom React frontend (replacing Evidence.dev)
+- [ ] Server-Sent Events (SSE) push for the live feed (replace polling)
 - [ ] Kubernetes Helm chart for on-prem deployment
 
 ---
