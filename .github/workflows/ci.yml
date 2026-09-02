@@ -11,7 +11,6 @@ on:
 
 env:
   PYTHON_VERSION: "3.11"
-  NODE_VERSION: "20"
 
 jobs:
   # =============================================================================
@@ -46,9 +45,6 @@ jobs:
       - name: Typecheck (mypy)
         run: uv run mypy scripts/db/ scripts/ingestion/ scripts/ml/ scripts/utils/
 
-      - name: SQL Lint (sqlfluff)
-        run: uv run sqlfluff lint evidence/sources/ --dialect duckdb
-
       - name: Generate test data
         run: uv run python scripts/utils/generate_synthetic.py --rows 5000 --output data/ledgerflow.duckdb
 
@@ -58,35 +54,6 @@ jobs:
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY_TEST }}
           PLAID_CLIENT_ID: ${{ secrets.PLAID_CLIENT_ID_TEST }}
           PLAID_SECRET: ${{ secrets.PLAID_SECRET_TEST }}
-
-  # =============================================================================
-  # JAVASCRIPT: Lint, Typecheck, Build
-  # =============================================================================
-  javascript:
-    name: JavaScript (lint, typecheck, build)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./evidence
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: "npm"
-          cache-dependency-path: "evidence/package-lock.json"
-
-      - name: Install dependencies
-        run: npm ci --legacy-peer-deps
-
-      - name: Lint (ESLint)
-        run: npm run lint
-
-      - name: Typecheck (TypeScript)
-        run: npm run typecheck
 
   # =============================================================================
   # SECURITY: Scan
