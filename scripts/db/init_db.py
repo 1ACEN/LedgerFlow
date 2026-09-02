@@ -153,7 +153,7 @@ CREATE TABLE IF NOT EXISTS ml.model_registry (
 );
 
 -- =============================================================================
--- ANALYTICS VIEWS (Materialized for Evidence.dev)
+-- ANALYTICS VIEWS (consumed by the unified dashboard /reports/* endpoints)
 -- =============================================================================
 
 -- Daily cash position
@@ -237,7 +237,7 @@ FROM transactions
 WHERE dispute_id IS NOT NULL
 ORDER BY occurred_at DESC;
 
--- Forecasts alias — Evidence pages query this as ledgerflow.forecasts
+-- Forecasts alias for the dashboard's cashflow report
 CREATE OR REPLACE VIEW analytics.forecasts AS
 SELECT
     forecast_date,

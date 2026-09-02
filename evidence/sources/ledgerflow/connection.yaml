@@ -1,4 +1,0 @@
-name: ledgerflow
-type: duckdb
-options:
-  filename: ../../../data/ledgerflow.duckdb

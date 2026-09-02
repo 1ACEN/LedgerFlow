@@ -1,5 +1,0 @@
-plugins:
-  datasources:
-    "@evidence-dev/duckdb": {}
-  components:
-    "@evidence-dev/core-components": {}
