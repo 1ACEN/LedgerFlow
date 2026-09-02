@@ -1,6 +1,6 @@
 #!/bin/bash
 # LedgerFlow Docker Entrypoint
-# Starts cron daemon and Evidence.dev server
+# Initializes the ledger, then starts cron + the unified FastAPI dashboard
 
 set -euo pipefail
 
@@ -25,23 +25,16 @@ if [ ! -f "$MODEL_REGISTRY_PATH/cash_forecast.joblib" ] || [ ! -f "$MODEL_REGIST
     python scripts/ml/train_retry.py --db "$DUCKDB_PATH" --output "$MODEL_REGISTRY_PATH/decline_retry.joblib"
 fi
 
-# Start Evidence.dev server in background
-echo "🌐 Starting Evidence.dev dashboard on port ${PORT:-3000}..."
-cd /app/evidence
-npx evidence serve --port "${PORT:-3000}" --host 0.0.0.0 &
+# Generate forecast predictions so the dashboard has data on first boot
+if [ -f "$MODEL_REGISTRY_PATH/cash_forecast.joblib" ]; then
+    echo "🔮 Generating cash flow forecast predictions..."
+    python scripts/ml/predict_cashflow.py --db "$DUCKDB_PATH" --model "$MODEL_REGISTRY_PATH/cash_forecast.joblib"
+fi
 
-EVIDENCE_PID=$!
-
-# Function to handle shutdown
-shutdown() {
-    echo "🛑 Shutting down..."
-    kill $EVIDENCE_PID 2>/dev/null || true
-    wait $EVIDENCE_PID 2>/dev/null || true
-    exit 0
-}
-
-trap shutdown SIGTERM SIGINT
-
-# Start cron in foreground (this is the main process)
+# Start cron daemon in background (nightly ingest / reconciliation / retraining)
 echo "⏰ Starting cron daemon..."
-exec cron -f -L 15
+cron
+
+# Start the unified FastAPI dashboard as the main process
+echo "🌐 Starting LedgerFlow unified dashboard on port ${WEBHOOK_PORT:-8080}..."
+exec uvicorn scripts.api.webhooks:app --host 0.0.0.0 --port "${WEBHOOK_PORT:-8080}"

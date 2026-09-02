@@ -8,14 +8,15 @@ primary_region = "iad"
   dockerfile = "docker/Dockerfile"
 
 [env]
-  PORT = "3000"
+  WEBHOOK_PORT = "8080"
+  DEMO_MODE = "false"
   PYTHONUNBUFFERED = "1"
   DUCKDB_PATH = "/data/ledgerflow.duckdb"
   MODEL_REGISTRY_PATH = "/models/"
 
-# HTTP service - Evidence.dev dashboard
+# HTTP service - Unified LedgerFlow dashboard (FastAPI)
 [http_service]
-  internal_port = 3000
+  internal_port = 8080
   force_https = true
   auto_stop_machines = false
   auto_start_machines = true
@@ -45,7 +46,7 @@ primary_region = "iad"
 # Scaling
 [[services]]
   protocol = "tcp"
-  internal_port = 3000
+  internal_port = 8080
 
   [[services.ports]]
     port = 80

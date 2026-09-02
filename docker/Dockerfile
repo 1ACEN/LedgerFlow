@@ -1,22 +1,9 @@
 # LedgerFlow Dockerfile
 # Multi-stage build: builder → runtime
-# Runs Evidence.dev dashboard + Python ingestion/ML cron jobs
+# Runs the unified LedgerFlow dashboard (FastAPI) + Python ingestion/ML cron jobs
 
 # =============================================================================
-# STAGE 1: Builder (Node for Evidence, Python for deps)
-# =============================================================================
-FROM node:20-alpine AS node-builder
-
-WORKDIR /app/evidence
-COPY evidence/package*.json ./
-RUN npm ci --prefer-offline --no-audit --progress=false
-
-COPY evidence/ .
-RUN npm run build
-
-
-# =============================================================================
-# STAGE 2: Python builder (compile wheels, install deps)
+# STAGE 1: Python builder (compile wheels, install deps)
 # =============================================================================
 FROM python:3.11-slim AS python-builder
 
@@ -27,7 +14,7 @@ RUN pip install --no-cache-dir --upgrade pip uv && \
 
 
 # =============================================================================
-# STAGE 3: Runtime
+# STAGE 2: Runtime
 # =============================================================================
 FROM python:3.11-slim AS runtime
 
@@ -49,10 +36,6 @@ COPY --from=python-builder /usr/local/bin/uv /usr/local/bin/uv
 
 # Copy application code
 COPY scripts/ ./scripts/
-COPY evidence/sources/ ./evidence/sources/
-COPY --from=node-builder /app/evidence/build ./evidence/build
-COPY --from=node-builder /app/evidence/node_modules ./evidence/node_modules
-COPY --from=node-builder /app/evidence/package.json ./evidence/package.json
 
 # Create directories for persistent data
 RUN mkdir -p /data /models /var/log/ledgerflow && \
@@ -70,17 +53,14 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     DUCKDB_PATH=/data/ledgerflow.duckdb \
     MODEL_REGISTRY_PATH=/models/ \
-    EVIDENCE_BUILD_PATH=/app/evidence/build \
-    PORT=3000 \
     WEBHOOK_PORT=8080
 
 USER ledgerflow
 
-EXPOSE 3000 8080
+EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:3000/health || exit 1
+    CMD curl -f http://localhost:8080/health || exit 1
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
-CMD ["cron", "-f"]

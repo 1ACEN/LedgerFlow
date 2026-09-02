@@ -9,11 +9,13 @@ services:
       target: runtime
     container_name: ledgerflow-app
     ports:
-      - "3000:3000"
+      - "8080:8080"
     environment:
       - DUCKDB_PATH=/data/ledgerflow.duckdb
       - MODEL_REGISTRY_PATH=/models/
       - GENERATE_SYNTHETIC=true
+      - DEMO_MODE=${DEMO_MODE:-true}
+      - DEMO_INTERVAL_SEC=${DEMO_INTERVAL_SEC:-4}
       - LOG_LEVEL=INFO
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
@@ -24,11 +26,10 @@ services:
     volumes:
       - ledgerflow_data:/data
       - ledgerflow_models:/models
-      - ./evidence:/app/evidence:ro  # Mount for hot reload in dev
       - ./scripts:/app/scripts:ro
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3
