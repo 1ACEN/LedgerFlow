@@ -1,19 +1,19 @@
 # LedgerFlow Makefile
 # One-command dev, test, build, deploy
 
-.PHONY: help dev live dev-full seed generate-data train test lint typecheck build deploy clean
+.PHONY: help dev live seed generate-data train test lint typecheck build deploy clean
 
 # Default target
 help:
 	@echo "LedgerFlow — Financial Observability Platform"
 	@echo ""
 	@echo "Usage:"
-	@echo "  make dev            Start local dev environment (Evidence + DuckDB)"
+	@echo "  make dev            Start the unified dashboard on http://localhost:8080"
 	@echo "  make generate-data  Generate synthetic transaction data"
 	@echo "  make train          Train ML models (forecast + retry)"
-	@echo "  make test           Run all tests"
-	@echo "  make lint           Lint Python, JS, SQL"
-	@echo "  make typecheck      Type check Python + TypeScript"
+	@echo "  make test           Run Python tests"
+	@echo "  make lint           Lint Python"
+	@echo "  make typecheck      Type check Python"
 	@echo "  make build          Build Docker image"
 	@echo "  make deploy         Deploy to Fly.io"
 	@echo "  make clean          Remove generated files"
@@ -22,28 +22,15 @@ help:
 # DEVELOPMENT
 # =============================================================================
 
+# Start the unified dashboard (single merged FastAPI app on port 8080)
 dev: generate-data
-	@echo "Starting Evidence.dev dashboard on http://localhost:3000"
+	@echo "Starting LedgerFlow dashboard on http://localhost:8080"
 	@echo "Press Ctrl+C to stop"
-	cd evidence && npm run dev
-
-# Start the FastAPI live-input + webhook server (DEMO_MODE=true by default)
-live:
-	@echo "Starting LedgerFlow Live API on http://localhost:8080"
-	@echo "  Live Input UI: http://localhost:8080/"
-	@echo "  API Docs:      http://localhost:8080/docs"
-	@echo "  Demo stream:   ON (synthetic txns every 4s)"
 	@if not exist .env copy .env.example .env
 	uv run uvicorn scripts.api.webhooks:app --host 0.0.0.0 --port 8080 --reload
 
-# Start BOTH Evidence dashboard AND FastAPI live API (requires two terminals or a process manager)
-dev-full:
-	@echo "Starting full LedgerFlow stack..."
-	@echo "  Dashboard:   http://localhost:3000"
-	@echo "  Live API:    http://localhost:8080"
-	@if not exist .env copy .env.example .env
-	@start "LedgerFlow API" cmd /k uv run uvicorn scripts.api.webhooks:app --port 8080 --reload
-	cd evidence && npm run dev
+# Alias for make dev
+live: dev
 
 # Seed (or re-seed) the DuckDB with synthetic data
 seed:
@@ -66,41 +53,20 @@ train:
 # TESTING & QUALITY
 # =============================================================================
 
-test: test-python test-js
+test: test-python
 
 test-python:
 	@echo "Running Python tests..."
 	uv run pytest tests/unit tests/integration -v --tb=short
 
-test-js:
-	@echo "Running JavaScript tests..."
-	cd evidence && npm test
-
-lint: lint-python lint-js lint-sql
-
-lint-python:
+lint:
 	@echo "Linting Python..."
 	uv run ruff check scripts/ tests/
 	uv run ruff format --check scripts/ tests/
 
-
-lint-js:
-	@echo "Linting JavaScript/TypeScript..."
-	cd evidence && npm run lint
-
-lint-sql:
-	@echo "Linting SQL..."
-	uv run sqlfluff lint evidence/sources/
-
-typecheck: typecheck-python typecheck-js
-
-typecheck-python:
+typecheck:
 	@echo "Type checking Python..."
 	uv run mypy scripts/db/ scripts/ingestion/ scripts/ml/ scripts/utils/
-
-typecheck-js:
-	@echo "Type checking TypeScript..."
-	cd evidence && npm run typecheck
 
 # =============================================================================
 # BUILD & DEPLOY
@@ -114,13 +80,6 @@ build:
 deploy:
 	@echo "Deploying to Fly.io..."
 	fly deploy --config fly.toml
-
-# Deploy with specific environment
-deploy-staging:
-	fly deploy --config fly.staging.toml
-
-deploy-prod:
-	fly deploy --config fly.prod.toml
 
 # =============================================================================
 # DATABASE & MIGRATIONS
@@ -146,27 +105,20 @@ clean:
 	@echo "Cleaning generated files..."
 	rm -rf data/ledgerflow.duckdb
 	rm -rf models/*.joblib
-	rm -rf evidence/build
 	rm -rf .pytest_cache
 	rm -rf __pycache__
 	rm -rf scripts/__pycache__
 	rm -rf tests/__pycache__
 
-install: install-python install-js
-
-install-python:
+install:
 	@echo "Installing Python dependencies..."
 	uv sync --dev
-
-install-js:
-	@echo "Installing Node dependencies..."
-	cd evidence && npm ci
 
 # Quick aliases
 up: dev
 down:
-	@pkill -f "npm run dev" || true
-	@pkill -f "evidence" || true
+	@pkill -f "scripts.api.webhooks" || true
+	@pkill -f "uvicorn" || true
 
 logs:
 	fly logs -a ledgerflow
