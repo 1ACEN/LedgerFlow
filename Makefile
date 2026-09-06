@@ -26,7 +26,7 @@ help:
 dev: generate-data
 	@echo "Starting LedgerFlow dashboard on http://localhost:8080"
 	@echo "Press Ctrl+C to stop"
-	@if not exist .env copy .env.example .env
+	@test -f .env || cp .env.example .env
 	uv run uvicorn scripts.api.webhooks:app --host 0.0.0.0 --port 8080 --reload
 
 # Alias for make dev
