@@ -277,10 +277,17 @@ _UI_PATH = Path(__file__).parent / "live_input.html"
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 async def root():
     """Serve the live data input dashboard."""
+    # No-store so the browser never serves a stale cached copy of the UI —
+    # otherwise edits to live_input.html are invisible to users (the dashboard
+    # HTML is small and regenerated on every request anyway).
+    headers = {"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"}
     if _UI_PATH.exists():
-        return HTMLResponse(content=_UI_PATH.read_text(encoding="utf-8"))
+        return HTMLResponse(
+            content=_UI_PATH.read_text(encoding="utf-8"), headers=headers
+        )
     return HTMLResponse(
-        content="<p>Live input UI not found. Check <code>scripts/api/live_input.html</code>.</p>"
+        content="<p>Live input UI not found. Check <code>scripts/api/live_input.html</code>.</p>",
+        headers=headers,
     )
 
 
