@@ -15,8 +15,8 @@ done, skip the day — no empty commits.
 
 ## AR Aging
 
-- [ ] Add a "top overdue customers" spotlight card (highest 90+ day balances) above the table
-- [ ] Color-code aging-bucket rows in the table by severity (Current → 90+) with a legend
+- [x] Add a "top overdue customers" spotlight card (highest 90+ day balances) above the table
+- [x] Color-code aging-bucket rows in the table by severity (Current → 90+) with a legend
 - [ ] Show days-weighted average (DSO proxy) as a KPI
 
 ## Data / realism (demo generator)
@@ -34,7 +34,7 @@ done, skip the day — no empty commits.
 
 ## Polish & DX
 
-- [ ] Add a "Last updated" timestamp to the dashboard header (ties in with the no-store fix)
+- [x] Add a "Last updated" timestamp to the dashboard header (ties in with the no-store fix)
 - [ ] Chart hover tooltips: add delta/context on combo-chart points
 - [ ] Dark/light theme check across all 6 tabs once, fix any chart that renders illegible in one theme
 - [ ] `README.md`: add a one-line "how to see your contribution graph count your commits" note? (only if it helps)

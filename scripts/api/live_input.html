@@ -807,6 +807,108 @@
       main { padding: 20px 16px; }
     }
 
+    /* ── Last-updated timestamp ─────────────────────────────── */
+    .last-updated {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 500;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .last-updated .dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green-glow);
+    }
+
+    /* ── AR Aging row severity stripes ──────────────────────── */
+    .ar-severity-current  { border-left: 3px solid var(--green);  }
+    .ar-severity-moderate { border-left: 3px solid var(--yellow); }
+    .ar-severity-elevated { border-left: 3px solid var(--orange); }
+    .ar-severity-critical { border-left: 3px solid var(--red);    }
+
+    .ar-severity-current  td:first-child { padding-left: 11px; }
+    .ar-severity-moderate td:first-child { padding-left: 11px; }
+    .ar-severity-elevated td:first-child { padding-left: 11px; }
+    .ar-severity-critical td:first-child { padding-left: 11px; }
+
+    /* Severity legend */
+    .severity-legend {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 10px 20px;
+      font-size: 11px;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+    }
+    .severity-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .severity-legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    /* ── Top overdue spotlight card ─────────────────────────── */
+    .overdue-spotlight {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .overdue-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 20px;
+      border-bottom: 1px solid rgba(99,120,170,0.06);
+      transition: var(--transition);
+    }
+    .overdue-row:last-child { border-bottom: none; }
+    .overdue-row:hover { background: var(--bg-card-hover); }
+    .overdue-rank {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--red-soft);
+      color: var(--red);
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .overdue-info { flex: 1; min-width: 0; }
+    .overdue-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .overdue-meta {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 1px;
+    }
+    .overdue-amount {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--red);
+      font-variant-numeric: tabular-nums;
+      flex-shrink: 0;
+    }
+
     @media (max-width: 640px) {
       .grid-4 { grid-template-columns: 1fr; }
       .header-actions { gap: 6px; }
@@ -836,6 +938,10 @@
     <div class="header-spacer"></div>
 
     <div class="header-actions">
+      <div class="last-updated" id="last-updated">
+        <span class="dot"></span>
+        <span id="last-updated-text">—</span>
+      </div>
       <div class="demo-badge">
         <div class="demo-dot"></div>
         <span>Live Stream</span>
@@ -1318,31 +1424,56 @@
         </div>
       </div>
 
+      <!-- Top Overdue Customers Spotlight -->
       <div class="card animate-in stagger-1">
         <div class="card-header">
-          <div class="card-icon green">📑</div>
-          <span class="card-title">Accounts Receivable Aging Report</span>
-          <span class="card-subtitle">Accrual Basis Outstanding Invoices</span>
+          <div class="card-icon red">🚨</div>
+          <span class="card-title">Top Overdue Customers</span>
+          <span class="card-subtitle">highest 90+ day balances</span>
         </div>
-        <div class="card-body">
-          <div class="table-container">
-            <table class="data-table" id="table-ar">
-              <thead>
-                <tr>
-                  <th>Customer</th>
-                  <th style="text-align:center">Invoices</th>
-                  <th style="text-align:right">Total Outstanding</th>
-                  <th style="text-align:right">Current (&lt;30d)</th>
-                  <th style="text-align:right">31-60 Days</th>
-                  <th style="text-align:right">61-90 Days</th>
-                  <th style="text-align:right">90+ Days</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr><td colspan="7" class="empty-state"><div class="empty-state-title">Loading AR aging data…</div></td></tr>
-              </tbody>
-            </table>
+        <div class="card-body" style="padding:0;">
+          <div class="overdue-spotlight" id="overdue-spotlight">
+            <div class="empty-state" style="padding:32px;">
+              <div class="empty-state-icon">🚨</div>
+              <div class="empty-state-title">Loading overdue data…</div>
+            </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Full aging table with severity legend -->
+    <div class="card animate-in stagger-3" style="margin-top:16px;">
+      <div class="card-header">
+        <div class="card-icon green">📑</div>
+        <span class="card-title">Accounts Receivable Aging Report</span>
+        <span class="card-subtitle">Accrual Basis Outstanding Invoices · rows colored by severity</span>
+      </div>
+      <div class="card-body" style="padding:0;">
+        <div class="table-container">
+          <table class="data-table" id="table-ar">
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th style="text-align:center">Invoices</th>
+                <th style="text-align:right">Total Outstanding</th>
+                <th style="text-align:right">Current (&lt;30d)</th>
+                <th style="text-align:right">31-60 Days</th>
+                <th style="text-align:right">61-90 Days</th>
+                <th style="text-align:right">90+ Days</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="7" class="empty-state"><div class="empty-state-title">Loading AR aging data…</div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="severity-legend">
+          <span style="font-weight:600;color:var(--text-secondary);">Severity:</span>
+          <div class="severity-legend-item"><div class="severity-legend-dot" style="background:var(--green)"></div> Current (&lt;30d)</div>
+          <div class="severity-legend-item"><div class="severity-legend-dot" style="background:var(--yellow)"></div> 31–60 Days</div>
+          <div class="severity-legend-item"><div class="severity-legend-dot" style="background:var(--orange)"></div> 61–90 Days</div>
+          <div class="severity-legend-item"><div class="severity-legend-dot" style="background:var(--red)"></div> 90+ Days</div>
         </div>
       </div>
     </div>
@@ -1436,7 +1567,13 @@ function refreshCurrentTab() {
   loadTabData(currentTab);
 }
 
+function updateLastUpdated() {
+  const el = document.getElementById('last-updated-text');
+  if (el) el.textContent = 'Updated ' + new Date().toLocaleTimeString();
+}
+
 function loadTabData(tabId) {
+  updateLastUpdated();
   if (tabId === 'live-pipeline') {
     refreshLiveStats();
     refreshLiveFeed();
@@ -2089,9 +2226,19 @@ async function loadArAgingReport() {
     if (!r.ok) return;
     const { aging } = await r.json();
 
+    // ── Severity helper ───────────────────────────────────────
+    function arSeverity(row) {
+      if (row.days_90_plus > 0) return 'critical';
+      if (row.days_61_90 > 0) return 'elevated';
+      if (row.days_31_60 > 0) return 'moderate';
+      return 'current';
+    }
+
     const tbody = document.querySelector('#table-ar tbody');
-    tbody.innerHTML = aging.map(row => `
-      <tr>
+    tbody.innerHTML = aging.map(row => {
+      const sev = arSeverity(row);
+      return `
+      <tr class="ar-severity-${sev}">
         <td><strong>${row.customer_name || row.customer_id}</strong></td>
         <td style="text-align:center">${row.invoices}</td>
         <td style="text-align:right;font-weight:700">${fmt_usd(row.total)}</td>
@@ -2100,7 +2247,34 @@ async function loadArAgingReport() {
         <td style="text-align:right;color:var(--orange)">${fmt_usd(row.days_61_90)}</td>
         <td style="text-align:right;color:var(--red)">${fmt_usd(row.days_90_plus)}</td>
       </tr>
-    `).join('');
+    `}).join('');
+
+    // ── Top overdue spotlight (90+ day balances) ──────────────
+    const topOverdue = aging
+      .filter(row => row.days_90_plus > 0)
+      .sort((a, b) => b.days_90_plus - a.days_90_plus)
+      .slice(0, 5);
+
+    const spotlight = document.getElementById('overdue-spotlight');
+    if (topOverdue.length === 0) {
+      spotlight.innerHTML = `
+        <div class="empty-state" style="padding:32px;">
+          <div class="empty-state-icon">✅</div>
+          <div class="empty-state-title">No 90+ day overdue balances</div>
+          <div class="empty-state-desc">All receivables are within acceptable aging buckets</div>
+        </div>`;
+    } else {
+      spotlight.innerHTML = topOverdue.map((row, i) => `
+        <div class="overdue-row">
+          <div class="overdue-rank">${i + 1}</div>
+          <div class="overdue-info">
+            <div class="overdue-name">${row.customer_name || row.customer_id}</div>
+            <div class="overdue-meta">${row.invoices} invoice${row.invoices !== 1 ? 's' : ''} · ${fmt_usd(row.total)} total</div>
+          </div>
+          <div class="overdue-amount">${fmt_usd(row.days_90_plus)}</div>
+        </div>
+      `).join('');
+    }
 
     // ── AR KPIs ────────────────────────────────────────────────
     const totalOut = aging.reduce((s, x) => s + x.total, 0);
