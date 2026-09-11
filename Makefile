@@ -1,7 +1,7 @@
 # LedgerFlow Makefile
 # One-command dev, test, build, deploy
 
-.PHONY: help dev live seed generate-data train test lint typecheck build deploy clean
+.PHONY: help dev live seed generate-data train test lint typecheck build deploy clean web web-dev web-build web-install web-test
 
 # Default target
 help:
@@ -9,6 +9,9 @@ help:
 	@echo ""
 	@echo "Usage:"
 	@echo "  make dev            Start the unified dashboard on http://localhost:8080"
+	@echo "  make web            Start the React dev server (Vite) on http://localhost:5173"
+	@echo "  make web-build      Build the React frontend into frontend/dist"
+	@echo "  make web-test       Run the frontend Vitest suite"
 	@echo "  make generate-data  Generate synthetic transaction data"
 	@echo "  make train          Train ML models (forecast + retry)"
 	@echo "  make test           Run Python tests"
@@ -31,6 +34,26 @@ dev: generate-data
 
 # Alias for make dev
 live: dev
+
+# =============================================================================
+# FRONTEND (React / Vite)
+# =============================================================================
+
+# React dev server with API proxy -> FastAPI on 8080
+web:
+	cd frontend && npm run dev
+
+# Build the React app into frontend/dist (served by FastAPI at / when present)
+web-build:
+	cd frontend && npm run build
+
+# Install frontend dependencies
+web-install:
+	cd frontend && npm install
+
+# Run the frontend unit tests
+web-test:
+	cd frontend && npm test
 
 # Seed (or re-seed) the DuckDB with synthetic data
 seed:

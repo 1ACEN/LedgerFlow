@@ -3,6 +3,18 @@
 # Runs the unified LedgerFlow dashboard (FastAPI) + Python ingestion/ML cron jobs
 
 # =============================================================================
+# STAGE 0: Frontend builder (React / Vite)
+# =============================================================================
+FROM node:20-slim AS frontend-builder
+
+WORKDIR /app/frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+
+
+# =============================================================================
 # STAGE 1: Python builder (compile wheels, install deps)
 # =============================================================================
 FROM python:3.11-slim AS python-builder
@@ -36,6 +48,9 @@ COPY --from=python-builder /usr/local/bin/uv /usr/local/bin/uv
 
 # Copy application code
 COPY scripts/ ./scripts/
+
+# Copy the built React frontend (served by FastAPI at / when present)
+COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
 # Create directories for persistent data
 RUN mkdir -p /data /models /var/log/ledgerflow && \

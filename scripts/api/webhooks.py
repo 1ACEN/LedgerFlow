@@ -28,6 +28,7 @@ from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from rich.console import Console
 
@@ -272,22 +273,58 @@ def _demo_stream_loop():
 # =============================================================================
 
 _UI_PATH = Path(__file__).parent / "live_input.html"
+_FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 async def root():
-    """Serve the live data input dashboard."""
+    """Serve the dashboard UI.
+
+    Serves the built React app (frontend/dist) when present, otherwise falls
+    back to the classic self-contained dashboard (scripts/api/live_input.html).
+    """
     # No-store so the browser never serves a stale cached copy of the UI —
-    # otherwise edits to live_input.html are invisible to users (the dashboard
-    # HTML is small and regenerated on every request anyway).
+    # otherwise edits to the dashboard are invisible to users (the HTML is
+    # small and regenerated on every request anyway).
+    headers = {"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"}
+    react_index = _FRONTEND_DIST / "index.html"
+    if react_index.exists():
+        return HTMLResponse(
+            content=react_index.read_text(encoding="utf-8"), headers=headers
+        )
+    if _UI_PATH.exists():
+        return HTMLResponse(
+            content=_UI_PATH.read_text(encoding="utf-8"), headers=headers
+        )
+    return HTMLResponse(
+        content="<p>Dashboard UI not found. Check <code>frontend/dist</code> or <code>scripts/api/live_input.html</code>.</p>",
+        headers=headers,
+    )
+
+
+@app.get("/legacy", response_class=HTMLResponse, include_in_schema=False)
+async def legacy_dashboard():
+    """Serve the classic self-contained dashboard.
+
+    Kept reachable while the React migration is in progress: tabs that are not
+    yet ported link back here. The classic vanilla shell still supports all 6 tabs.
+    """
     headers = {"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"}
     if _UI_PATH.exists():
         return HTMLResponse(
             content=_UI_PATH.read_text(encoding="utf-8"), headers=headers
         )
     return HTMLResponse(
-        content="<p>Live input UI not found. Check <code>scripts/api/live_input.html</code>.</p>",
+        content="<p>Legacy dashboard not found. Check <code>scripts/api/live_input.html</code>.</p>",
         headers=headers,
+    )
+
+
+if _FRONTEND_DIST.exists():
+    app.mount(
+        "/assets",
+        StaticFiles(directory=_FRONTEND_DIST / "assets"),
+        name="frontend-assets",
     )
 
 
