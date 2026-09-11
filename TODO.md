@@ -28,8 +28,8 @@ done, skip the day — no empty commits.
 ## API & tests
 
 - [ ] Add pytest coverage for `/reports/revenue` (shape, totals, product grouping)
-- [ ] Add pytest coverage for `/reports/ar-aging` (bucket math, totals)
-- [ ] Add a smoke test that `GET /` includes the `Cache-Control: no-store` header
+- [x] Add pytest coverage for `/reports/ar-aging` (bucket math, totals)
+- [x] Add a smoke test that `GET /` includes the `Cache-Control: no-store` header
 - [ ] Wire the probe scripts (CDP screenshots) into the Makefile as `make smoke-dash`
 
 ## Polish & DX

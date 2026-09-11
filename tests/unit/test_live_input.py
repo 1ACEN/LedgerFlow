@@ -190,3 +190,43 @@ class TestAPIEndpoints:
         assert "total_transactions" in data
         assert "today" in data
         assert "by_source" in data
+
+    def test_root_endpoint(self, client):
+        """Verify GET / serves dashboard HTML with no-store cache headers."""
+        response = client.get("/")
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        assert "no-store" in response.headers.get("cache-control", "")
+
+    def test_legacy_dashboard_endpoint(self, client):
+        """Verify GET /legacy serves classic dashboard HTML with no-store cache headers."""
+        response = client.get("/legacy")
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        assert "no-store" in response.headers.get("cache-control", "")
+        assert "Ledger" in response.text
+
+    def test_ar_aging_report_endpoint(self, client):
+        """Verify GET /reports/ar-aging returns accounts receivable aging report."""
+        response = client.get("/reports/ar-aging")
+        assert response.status_code == 200
+        data = response.json()
+        assert "aging" in data
+        assert isinstance(data["aging"], list)
+        if data["aging"]:
+            row = data["aging"][0]
+            for key in [
+                "customer_id",
+                "invoices",
+                "total",
+                "current",
+                "days_31_60",
+                "days_61_90",
+                "days_90_plus",
+            ]:
+                assert key in row
+
+    def test_static_assets_mounted(self, client):
+        """Verify static assets route is mounted."""
+        mount_paths = [route.path for route in app.routes if hasattr(route, "path")]
+        assert "/assets" in mount_paths

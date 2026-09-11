@@ -29,7 +29,7 @@ help:
 dev: generate-data
 	@echo "Starting LedgerFlow dashboard on http://localhost:8080"
 	@echo "Press Ctrl+C to stop"
-	@test -f .env || cp .env.example .env
+	@uv run python -c "import pathlib, shutil; (e := pathlib.Path('.env')).exists() or shutil.copy('.env.example', e)"
 	uv run uvicorn scripts.api.webhooks:app --host 0.0.0.0 --port 8080 --reload
 
 # Alias for make dev
@@ -76,7 +76,7 @@ train:
 # TESTING & QUALITY
 # =============================================================================
 
-test: test-python
+test: test-python web-test
 
 test-python:
 	@echo "Running Python tests..."

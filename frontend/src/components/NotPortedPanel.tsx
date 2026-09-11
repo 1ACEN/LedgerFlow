@@ -24,7 +24,7 @@ export default function NotPortedPanel({ tabId }: Props) {
           </div>
           <a
             className="tab-btn active"
-            href="/legacy"
+            href={`/legacy?tab=${encodeURIComponent(tabId)}`}
             style={{ width: 'fit-content' }}
           >
             Open classic dashboard ↗

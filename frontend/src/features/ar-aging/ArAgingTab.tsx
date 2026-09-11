@@ -5,12 +5,18 @@ import ArBucketChart from './ArBucketChart';
 import OverdueSpotlight from './OverdueSpotlight';
 import ArAgingTable from './ArAgingTable';
 
-export default function ArAgingTab() {
+interface Props {
+  refreshKey?: number;
+}
+
+export default function ArAgingTab({ refreshKey }: Props) {
   const [aging, setAging] = useState<ArAgingRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    setError(null);
     fetchArAging()
       .then((data) => {
         if (!cancelled) setAging(data.aging);
@@ -21,7 +27,7 @@ export default function ArAgingTab() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadCount, refreshKey]);
 
   if (error) {
     return (
@@ -31,6 +37,13 @@ export default function ArAgingTab() {
             <div className="empty-state-icon">⚠️</div>
             <div className="empty-state-title">Failed to load AR aging</div>
             <div className="empty-state-desc">{error}</div>
+            <button
+              className="tab-btn active"
+              onClick={() => setReloadCount((c) => c + 1)}
+              style={{ width: 'fit-content', marginTop: '12px' }}
+            >
+              Try Again 🔄
+            </button>
           </div>
         </div>
       </div>

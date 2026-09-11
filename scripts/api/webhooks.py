@@ -289,13 +289,9 @@ async def root():
     headers = {"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"}
     react_index = _FRONTEND_DIST / "index.html"
     if react_index.exists():
-        return HTMLResponse(
-            content=react_index.read_text(encoding="utf-8"), headers=headers
-        )
+        return HTMLResponse(content=react_index.read_text(encoding="utf-8"), headers=headers)
     if _UI_PATH.exists():
-        return HTMLResponse(
-            content=_UI_PATH.read_text(encoding="utf-8"), headers=headers
-        )
+        return HTMLResponse(content=_UI_PATH.read_text(encoding="utf-8"), headers=headers)
     return HTMLResponse(
         content="<p>Dashboard UI not found. Check <code>frontend/dist</code> or <code>scripts/api/live_input.html</code>.</p>",
         headers=headers,
@@ -311,21 +307,20 @@ async def legacy_dashboard():
     """
     headers = {"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"}
     if _UI_PATH.exists():
-        return HTMLResponse(
-            content=_UI_PATH.read_text(encoding="utf-8"), headers=headers
-        )
+        return HTMLResponse(content=_UI_PATH.read_text(encoding="utf-8"), headers=headers)
     return HTMLResponse(
         content="<p>Legacy dashboard not found. Check <code>scripts/api/live_input.html</code>.</p>",
         headers=headers,
     )
 
 
-if _FRONTEND_DIST.exists():
-    app.mount(
-        "/assets",
-        StaticFiles(directory=_FRONTEND_DIST / "assets"),
-        name="frontend-assets",
-    )
+_FRONTEND_ASSETS = _FRONTEND_DIST / "assets"
+_FRONTEND_ASSETS.mkdir(parents=True, exist_ok=True)
+app.mount(
+    "/assets",
+    StaticFiles(directory=_FRONTEND_ASSETS),
+    name="frontend-assets",
+)
 
 
 # =============================================================================

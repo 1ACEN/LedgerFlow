@@ -216,6 +216,29 @@ body::before {
   50%       { opacity: 0.5; transform: scale(0.75); box-shadow: 0 0 2px var(--green-glow); }
 }
 
+.refresh-btn, .link-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 13px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-decoration: none;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.refresh-btn:hover, .link-btn:hover {
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-sm);
+}
+
 .tab-nav {
   display: flex;
   gap: 4px;

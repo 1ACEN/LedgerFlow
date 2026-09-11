@@ -56,6 +56,38 @@ jobs:
           PLAID_SECRET: ${{ secrets.PLAID_SECRET_TEST }}
 
   # =============================================================================
+  # FRONTEND: Typecheck, Test, Build
+  # =============================================================================
+  frontend:
+    name: Frontend (typecheck, test, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: "frontend/package-lock.json"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck (tsc)
+        run: npm run typecheck
+
+      - name: Unit tests (vitest)
+        run: npm test
+
+      - name: Build bundle (vite)
+        run: npm run build
+
+  # =============================================================================
   # SECURITY: Scan
   # =============================================================================
   security:

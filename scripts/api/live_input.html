@@ -949,6 +949,9 @@
       <button class="refresh-btn" onclick="refreshCurrentTab()">
         🔄 Refresh
       </button>
+      <a href="/" class="link-btn" title="Open React Dashboard">
+        ⚛️ React App
+      </a>
       <a href="/docs" target="_blank" class="link-btn">
         API Docs
       </a>
@@ -2333,11 +2336,22 @@ async function loadArAgingReport() {
 
 
 /* ================================================================
-   AUTO REFRESH LOOP
+   AUTO REFRESH LOOP & INITIALIZATION
 ================================================================ */
 updateLastUpdated();
-refreshLiveStats();
-refreshLiveFeed();
+
+// Check for requested tab in ?tab= query parameter or #hash (from React NotPortedPanel)
+const urlParams = new URLSearchParams(window.location.search);
+const requestedTab = urlParams.get('tab') || window.location.hash.replace(/^#(tab-)?/, '');
+const VALID_TABS = ['live-pipeline', 'executive', 'cashflow', 'revenue', 'ops', 'ar-aging'];
+
+if (requestedTab && VALID_TABS.includes(requestedTab)) {
+  switchTab(requestedTab);
+} else {
+  refreshLiveStats();
+  refreshLiveFeed();
+}
+
 setInterval(() => {
   if (currentTab === 'live-pipeline') {
     refreshLiveStats();

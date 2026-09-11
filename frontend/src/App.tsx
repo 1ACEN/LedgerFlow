@@ -10,12 +10,18 @@ function formatLastUpdated(d: Date): string {
 export default function App() {
   const [activeTab, setActiveTab] = useState('ar-aging');
   const [lastUpdated, setLastUpdated] = useState(() => formatLastUpdated(new Date()));
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Update the header timestamp on mount and whenever the tab changes —
   // mirrors updateLastUpdated() in the classic dashboard.
   useEffect(() => {
     setLastUpdated(formatLastUpdated(new Date()));
   }, [activeTab]);
+
+  const handleRefresh = () => {
+    setLastUpdated(formatLastUpdated(new Date()));
+    setRefreshKey((k) => k + 1);
+  };
 
   return (
     <div>
@@ -38,6 +44,18 @@ export default function App() {
               <div className="demo-dot"></div>
               <span>Live Stream</span>
             </div>
+            <button className="refresh-btn" onClick={handleRefresh} title="Refresh current tab">
+              🔄 Refresh
+            </button>
+            <a
+              href="/docs"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="link-btn"
+              title="Open FastAPI documentation"
+            >
+              API Docs
+            </a>
           </div>
         </div>
         <nav className="tab-nav">
@@ -56,7 +74,7 @@ export default function App() {
       <main className="layout">
         {PORTED_TABS.has(activeTab) ? (
           activeTab === 'ar-aging' ? (
-            <ArAgingTab />
+            <ArAgingTab refreshKey={refreshKey} />
           ) : null
         ) : (
           <NotPortedPanel tabId={activeTab} />
