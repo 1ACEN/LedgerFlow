@@ -15,6 +15,10 @@ export default function ChartBox({ config }: Props) {
   // (Re)create on every config change; destroy on unmount.
   useEffect(() => {
     if (!canvasRef.current) return;
+    const existing = Chart.getChart(canvasRef.current);
+    if (existing) {
+      existing.destroy();
+    }
     const chart = new Chart(canvasRef.current, config);
     chartRef.current = chart;
     return () => {

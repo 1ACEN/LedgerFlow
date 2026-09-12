@@ -226,6 +226,20 @@ class TestAPIEndpoints:
             ]:
                 assert key in row
 
+    def test_revenue_report_endpoint(self, client):
+        """Verify GET /reports/revenue returns revenue by product and monthly P&L."""
+        response = client.get("/reports/revenue")
+        assert response.status_code == 200
+        data = response.json()
+        assert "revenue_by_product" in data
+        assert "monthly_pl" in data
+        assert isinstance(data["revenue_by_product"], list)
+        assert isinstance(data["monthly_pl"], list)
+        if data["revenue_by_product"]:
+            row = data["revenue_by_product"][0]
+            for key in ["month", "product_line", "revenue", "net_revenue"]:
+                assert key in row
+
     def test_static_assets_mounted(self, client):
         """Verify static assets route is mounted."""
         mount_paths = [route.path for route in app.routes if hasattr(route, "path")]

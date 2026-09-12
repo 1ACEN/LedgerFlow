@@ -26,10 +26,10 @@ help:
 # =============================================================================
 
 # Start the unified dashboard (single merged FastAPI app on port 8080)
-dev: generate-data
+dev:
+	@uv run python -c "import pathlib, shutil; (e := pathlib.Path('.env')).exists() or shutil.copy('.env.example', e); (d := pathlib.Path('data/ledgerflow.duckdb')).exists() or __import__('subprocess').run(['uv', 'run', 'python', 'scripts/utils/generate_synthetic.py', '--rows', '5000', '--output', 'data/ledgerflow.duckdb'])"
 	@echo "Starting LedgerFlow dashboard on http://localhost:8080"
 	@echo "Press Ctrl+C to stop"
-	@uv run python -c "import pathlib, shutil; (e := pathlib.Path('.env')).exists() or shutil.copy('.env.example', e)"
 	uv run uvicorn scripts.api.webhooks:app --host 0.0.0.0 --port 8080 --reload
 
 # Alias for make dev

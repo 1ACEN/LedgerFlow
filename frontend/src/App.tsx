@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { TABS, PORTED_TABS } from './lib/tabs';
 import NotPortedPanel from './components/NotPortedPanel';
 import ArAgingTab from './features/ar-aging/ArAgingTab';
+import RevenueTab from './features/revenue/RevenueTab';
 
 function formatLastUpdated(d: Date): string {
   return 'Updated ' + d.toLocaleTimeString();
@@ -75,6 +76,8 @@ export default function App() {
         {PORTED_TABS.has(activeTab) ? (
           activeTab === 'ar-aging' ? (
             <ArAgingTab refreshKey={refreshKey} />
+          ) : activeTab === 'revenue' ? (
+            <RevenueTab refreshKey={refreshKey} />
           ) : null
         ) : (
           <NotPortedPanel tabId={activeTab} />
