@@ -240,6 +240,24 @@ class TestAPIEndpoints:
             for key in ["month", "product_line", "revenue", "net_revenue"]:
                 assert key in row
 
+    def test_cashflow_report_endpoint(self, client):
+        """Verify GET /reports/cashflow returns forecast fan chart data and weekly flows."""
+        response = client.get("/reports/cashflow")
+        assert response.status_code == 200
+        data = response.json()
+        assert "forecast" in data
+        assert "weekly" in data
+        assert isinstance(data["forecast"], list)
+        assert isinstance(data["weekly"], list)
+        if data["forecast"]:
+            row = data["forecast"][0]
+            for key in ["date", "p10", "p50", "p90", "inflows", "outflows"]:
+                assert key in row
+        if data["weekly"]:
+            w_row = data["weekly"][0]
+            for key in ["week", "inflows", "outflows", "net"]:
+                assert key in w_row
+
     def test_static_assets_mounted(self, client):
         """Verify static assets route is mounted."""
         mount_paths = [route.path for route in app.routes if hasattr(route, "path")]

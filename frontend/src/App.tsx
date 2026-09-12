@@ -3,6 +3,7 @@ import { TABS, PORTED_TABS } from './lib/tabs';
 import NotPortedPanel from './components/NotPortedPanel';
 import ArAgingTab from './features/ar-aging/ArAgingTab';
 import RevenueTab from './features/revenue/RevenueTab';
+import CashflowTab from './features/cashflow/CashflowTab';
 
 function formatLastUpdated(d: Date): string {
   return 'Updated ' + d.toLocaleTimeString();
@@ -78,6 +79,8 @@ export default function App() {
             <ArAgingTab refreshKey={refreshKey} />
           ) : activeTab === 'revenue' ? (
             <RevenueTab refreshKey={refreshKey} />
+          ) : activeTab === 'cashflow' ? (
+            <CashflowTab refreshKey={refreshKey} />
           ) : null
         ) : (
           <NotPortedPanel tabId={activeTab} />

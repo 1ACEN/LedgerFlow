@@ -15,4 +15,4 @@ export const TABS: TabDef[] = [
   { id: 'ar-aging', label: 'AR Aging', icon: '📑' },
 ];
 
-export const PORTED_TABS = new Set(['ar-aging', 'revenue']);
+export const PORTED_TABS = new Set(['ar-aging', 'revenue', 'cashflow']);
