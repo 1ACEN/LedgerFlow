@@ -279,6 +279,36 @@ class TestAPIEndpoints:
             for key in ["date", "cash", "net", "inflows", "outflows"]:
                 assert key in row
 
+    def test_ops_report_endpoint(self, client):
+        """Verify GET /reports/ops returns declines, success trends, retry advisor, and disputes."""
+        response = client.get("/reports/ops")
+        assert response.status_code == 200
+        data = response.json()
+        for key in ["declines", "success_trend", "retry_advisor", "disputes"]:
+            assert key in data
+            assert isinstance(data[key], list)
+        if data["declines"]:
+            for key in ["code", "count"]:
+                assert key in data["declines"][0]
+        if data["success_trend"]:
+            for key in ["date", "source", "rate"]:
+                assert key in data["success_trend"][0]
+        if data["retry_advisor"]:
+            for key in [
+                "transaction_id",
+                "decline_code",
+                "brand",
+                "funding",
+                "amount_usd",
+                "probability",
+                "action",
+                "recovery_usd",
+            ]:
+                assert key in data["retry_advisor"][0]
+        if data["disputes"]:
+            for key in ["dispute_id", "transaction_id", "customer_id", "amount_usd", "status"]:
+                assert key in data["disputes"][0]
+
     def test_static_assets_mounted(self, client):
         """Verify static assets route is mounted."""
         mount_paths = [route.path for route in app.routes if hasattr(route, "path")]
