@@ -258,6 +258,27 @@ class TestAPIEndpoints:
             for key in ["week", "inflows", "outflows", "net"]:
                 assert key in w_row
 
+    def test_executive_report_endpoint(self, client):
+        """Verify GET /reports/executive returns cash, runway, and cash trajectory trend."""
+        response = client.get("/reports/executive")
+        assert response.status_code == 200
+        data = response.json()
+        for key in [
+            "current_cash",
+            "runway_p50",
+            "success_rate_24h",
+            "net_burn_30d",
+            "total_transactions",
+            "last_ingested",
+            "cash_trend",
+        ]:
+            assert key in data
+        assert isinstance(data["cash_trend"], list)
+        if data["cash_trend"]:
+            row = data["cash_trend"][0]
+            for key in ["date", "cash", "net", "inflows", "outflows"]:
+                assert key in row
+
     def test_static_assets_mounted(self, client):
         """Verify static assets route is mounted."""
         mount_paths = [route.path for route in app.routes if hasattr(route, "path")]
