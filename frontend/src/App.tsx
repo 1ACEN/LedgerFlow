@@ -6,6 +6,7 @@ import RevenueTab from './features/revenue/RevenueTab';
 import CashflowTab from './features/cashflow/CashflowTab';
 import { ExecutiveTab } from './features/executive/ExecutiveTab';
 import { OpsTab } from './features/ops/OpsTab';
+import { LivePipelineTab } from './features/live-pipeline/LivePipelineTab';
 
 function formatLastUpdated(d: Date): string {
   return 'Updated ' + d.toLocaleTimeString();
@@ -87,6 +88,8 @@ export default function App() {
             <ExecutiveTab refreshKey={refreshKey} />
           ) : activeTab === 'ops' ? (
             <OpsTab refreshKey={refreshKey} />
+          ) : activeTab === 'live-pipeline' ? (
+            <LivePipelineTab refreshKey={refreshKey} />
           ) : null
         ) : (
           <NotPortedPanel tabId={activeTab} />
