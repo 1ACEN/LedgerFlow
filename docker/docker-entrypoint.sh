@@ -10,12 +10,12 @@ echo "🚀 Starting LedgerFlow container..."
 if [ ! -f "$DUCKDB_PATH" ]; then
     echo "📊 Initializing DuckDB schema..."
     python scripts/db/init_db.py --db "$DUCKDB_PATH"
-fi
 
-# Generate synthetic data in dev mode (if no real data)
-if [ "${GENERATE_SYNTHETIC:-false}" = "true" ] && [ ! -f "$DUCKDB_PATH" ]; then
-    echo "🎲 Generating synthetic data..."
-    python scripts/utils/generate_synthetic.py --rows 50000 --output "$DUCKDB_PATH"
+    # Generate synthetic data in dev / demo mode
+    if [ "${GENERATE_SYNTHETIC:-true}" = "true" ]; then
+        echo "🎲 Generating synthetic data..."
+        python scripts/utils/generate_synthetic.py --rows 50000 --output "$DUCKDB_PATH"
+    fi
 fi
 
 # Train models if not exist
@@ -31,10 +31,13 @@ if [ -f "$MODEL_REGISTRY_PATH/cash_forecast.joblib" ]; then
     python scripts/ml/predict_cashflow.py --db "$DUCKDB_PATH" --model "$MODEL_REGISTRY_PATH/cash_forecast.joblib"
 fi
 
-# Start cron daemon in background (nightly ingest / reconciliation / retraining)
+# Start cron daemon in background if root/permitted (nightly ingest / reconciliation / retraining)
 echo "⏰ Starting cron daemon..."
-cron
+cron 2>/dev/null || true
+
+# Determine port (Render sets PORT; local/Fly uses WEBHOOK_PORT or 8080)
+APP_PORT="${PORT:-${WEBHOOK_PORT:-8080}}"
 
 # Start the unified FastAPI dashboard as the main process
-echo "🌐 Starting LedgerFlow unified dashboard on port ${WEBHOOK_PORT:-8080}..."
-exec uvicorn scripts.api.webhooks:app --host 0.0.0.0 --port "${WEBHOOK_PORT:-8080}"
+echo "🌐 Starting LedgerFlow unified dashboard on port ${APP_PORT}..."
+exec uvicorn scripts.api.webhooks:app --host 0.0.0.0 --port "${APP_PORT}"

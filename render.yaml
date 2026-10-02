@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: ledgerflow
+    runtime: docker
+    dockerfilePath: ./docker/Dockerfile
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: DEMO_MODE
+        value: "true"
+      - key: GENERATE_SYNTHETIC
+        value: "true"
+      - key: DUCKDB_PATH
+        value: /data/ledgerflow.duckdb
+      - key: MODEL_REGISTRY_PATH
+        value: /models/

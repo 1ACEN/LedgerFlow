@@ -5,6 +5,8 @@
 [![CI](https://github.com/yourusername/ledgerflow/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/ledgerflow/actions/workflows/ci.yml)
 [![Deploy](https://github.com/yourusername/ledgerflow/actions/workflows/deploy.yml/badge.svg)](https://github.com/yourusername/ledgerflow/actions/workflows/deploy.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![React 18](https://img.shields.io/badge/react-18-61dafb.svg?logo=react&logoColor=black)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/typescript-5-3178c6.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
@@ -29,10 +31,17 @@ LedgerFlow ingests transactions from Stripe and bank feeds (via Plaid), normalis
 
 ```
 ┌─────────────┐     ┌──────────────┐     ┌─────────────────┐     ┌────────────────────────────┐
-│  Stripe     │     │              │     │   DuckDB /      │     │   FastAPI Unified          │
-│  Webhooks   │────▶│  Ingestion   │────▶│   Postgres      │────▶│   Dashboard (single app)  │
-│  Plaid Feeds│     │  (Python)    │     │   (Ledger)      │     │   · Live Pipeline         │
-└─────────────┘     └──────────────┘     └────────┬────────┘     │   · Executive Overview     │
+│  Stripe     │     │              │     │   DuckDB /      │     │   FastAPI Backend          │
+│  Webhooks   │────▶│  Ingestion   │────▶│   Postgres      │────▶│   · Live API & Webhooks    │
+│  Plaid Feeds│     │  (Python)    │     │   (Ledger)      │     │   · Analytics / Reports    │
+└─────────────┘     └──────────────┘     └────────┬────────┘     │   · Serves Built React SPA │
+                                                  │              └─────────────┬──────────────┘
+                                                  │                            │
+                                                  │                            ▼
+                                                  │              ┌────────────────────────────┐
+                                                  │              │   React + Vite SPA         │
+                                                  │              │   · Live Pipeline & Stream │
+                                                  │              │   · Executive Overview     │
                                                   │              │   · Cash Flow & Forecast   │
                                                   │              │   · CFO & Revenue          │
                                                   │              │   · Ops & AI Advisor       │
@@ -48,7 +57,8 @@ LedgerFlow ingests transactions from Stripe and bank feeds (via Plaid), normalis
 **Key design decisions:**
 - **DuckDB** — embedded OLAP engine; no separate database server required locally
 - **Polars** — fast in-process DataFrame transforms before writing to DuckDB
-- **Single FastAPI dashboard** — one Python process serves the live streaming feed (SSE-style polling), manual transaction entry, Stripe/Plaid webhooks, and all BI tabs from the same origin
+- **Unified FastAPI & React architecture** — single FastAPI service serves live streaming feeds, manual transaction entry, webhooks, analytics endpoints, and the compiled modern React SPA from the same origin (with classic self-contained fallback at `/legacy`)
+- **React 18 + TypeScript + Vite** — modular component-based frontend with Chart.js visualization for all 6 financial operations tabs
 - **uv** — fast, reproducible Python dependency management
 
 ---
@@ -59,9 +69,11 @@ LedgerFlow ingests transactions from Stripe and bank feeds (via Plaid), normalis
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| Python | 3.11+ | Ingestion, ML, dashboard, scripts |
+| Python | 3.11+ | Ingestion, ML, backend API, scripts |
 | uv | latest | Python package manager (`curl -LsSf https://astral.sh/uv/install.sh \| sh`) |
-| Docker | any | Production image |
+| Node.js | 18+ / 20+ | Frontend dependencies and Vite build |
+| npm | 9+ | Node package manager |
+| Docker | any | Multi-stage production container image |
 | flyctl | latest | Fly.io deployment |
 
 ### 1. Clone and install
@@ -70,8 +82,9 @@ LedgerFlow ingests transactions from Stripe and bank feeds (via Plaid), normalis
 git clone https://github.com/yourusername/ledgerflow.git
 cd ledgerflow
 
-# Install Python dependencies
+# Install Python and frontend dependencies
 make install
+make web-install
 ```
 
 ### 2. Configure environment
@@ -109,9 +122,16 @@ make dev             # Generate data + start unified dashboard (port 8080)
 make generate-data   # Generate 50k synthetic transactions into DuckDB
 make train           # Train both ML models
 
+# Frontend (React / Vite)
+make web             # Start React Vite dev server (port 5173) with API proxy
+make web-build       # Build production React frontend into frontend/dist
+make web-install     # Install frontend dependencies (npm install)
+make web-test        # Run frontend Vitest test suite
+
 # Testing & quality
-make test            # Run all Python tests
-make lint            # Ruff check
+make test            # Run all tests (Python pytest + frontend Vitest)
+make test-python     # Run Python unit and integration tests
+make lint            # Ruff check & format check
 make typecheck       # mypy type checking
 
 # Database
@@ -120,7 +140,7 @@ make db-migrate      # Run schema migrations
 make db-reconcile    # Run nightly reconciliation manually
 
 # Build & deploy
-make build           # Build Docker image
+make build           # Build multi-stage Docker image
 make deploy          # Deploy to Fly.io (fly.toml)
 make deploy-staging  # Deploy using staging config
 make deploy-prod     # Deploy using production config
@@ -172,9 +192,11 @@ Production runs with `DEMO_MODE=false` — the dashboard reflects only real inge
 ## Testing
 
 ```bash
-make test          # Unit + integration tests (pytest)
-make lint          # Ruff
-make typecheck     # mypy
+make test          # Full suite: Python (pytest) + Frontend (Vitest)
+make test-python   # Python unit and integration tests only
+make web-test      # Frontend unit and hook tests only
+make lint          # Ruff check & formatting validation
+make typecheck     # mypy type checking
 ```
 
 ---
@@ -186,18 +208,37 @@ ledgerflow/
 │
 ├── .github/
 │   └── workflows/
-│       └── ci.yml                      # CI: lint → typecheck → test → security scan
+│       └── ci.yml                      # CI: python (lint/typecheck/test) + frontend (tsc/vitest/build)
 │
 ├── docker/
-│   ├── Dockerfile                      # Single-stage runtime image (Python)
+│   ├── Dockerfile                      # Multi-stage image (Node frontend builder + Python runtime)
 │   ├── docker-entrypoint.sh            # Container startup logic
 │   └── crontab                         # Cron schedules (nightly ingest, weekly retrain)
 │
+├── frontend/                           # React 18 + TypeScript + Vite SPA
+│   ├── src/
+│   │   ├── components/                 # Shared UI components
+│   │   ├── features/                   # 6 Dashboard tabs:
+│   │   │   ├── live-pipeline/          # Real-time transaction ticker & manual entry
+│   │   │   ├── executive/              # Runway, burn rate, cash trajectory
+│   │   │   ├── cashflow/               # 13-week ML forecast fan chart (P10/P50/P90)
+│   │   │   ├── revenue/                # P&L, MoM growth combo, product mix
+│   │   │   ├── ops/                    # Decline analysis & ML retry advisor
+│   │   │   └── ar-aging/               # AR aging buckets & overdue spotlight
+│   │   ├── lib/                        # API client, tab definitions, formatters
+│   │   ├── styles/                     # CSS stylesheets & design tokens
+│   │   ├── App.tsx                     # Main layout shell and tab router
+│   │   └── main.tsx                    # React entry point
+│   ├── dist/                           # Compiled production bundle (served by FastAPI at /)
+│   ├── package.json
+│   ├── tsconfig.json
+│   └── vite.config.ts
+│
 ├── scripts/                            # Python pipeline — grouped by responsibility
-│   ├── api/                            # The unified dashboard backend
+│   ├── api/                            # Unified FastAPI service
 │   │   ├── __init__.py
-│   │   ├── webhooks.py                 # FastAPI: serves dashboard + webhooks + live API
-│   │   └── live_input.html             # Single-page unified dashboard (6 tabs)
+│   │   ├── webhooks.py                 # FastAPI: serves React app + webhooks + REST endpoints
+│   │   └── live_input.html             # Classic fallback dashboard (reachable at /legacy)
 │   │
 │   ├── db/                             # Database management
 │   │   ├── __init__.py
@@ -302,8 +343,8 @@ It also provides a **manual transaction input form** and a **live streaming feed
 
 ## Resume Bullet
 
-> **LedgerFlow** — *Python · DuckDB · Polars · FastAPI · LightGBM · XGBoost · Fly.io · GitHub Actions*
-> Built a deployable financial observability platform ingesting Stripe + Plaid bank feeds into a unified ledger; shipped a single unified dashboard combining a real-time streaming pipeline, manual transaction input, ML 13-week cash forecast with prediction intervals (quantile regression), CFO variance views, and decline-retry advisor; automated nightly reconciliation and weekly model retraining via CI/CD on Fly.io.
+> **LedgerFlow** — *Python · TypeScript · React 18 · DuckDB · Polars · FastAPI · LightGBM · XGBoost · Vite · Fly.io · GitHub Actions*
+> Built a deployable financial observability platform ingesting Stripe + Plaid bank feeds into a unified ledger; shipped a unified dashboard (modular React/TypeScript SPA served via FastAPI) combining a real-time streaming pipeline, manual transaction input, ML 13-week cash forecast with prediction intervals (quantile regression), CFO variance views, and decline-retry advisor; automated nightly reconciliation and weekly model retraining via CI/CD on Fly.io.
 
 ---
 
