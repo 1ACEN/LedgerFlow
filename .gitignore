@@ -8,8 +8,8 @@ venv/
 dist/
 .eggs/
 
-# Models (large binary files)
-models/*.joblib
+# Models
+!models/*.joblib
 models/*.pkl
 
 # Data / DuckDB

@@ -42,18 +42,20 @@ RUN groupadd -r ledgerflow && useradd -r -g ledgerflow -d /app -s /bin/bash ledg
 
 WORKDIR /app
 
-# Copy Python deps from builder
+# Copy Python deps and binaries from builder
 COPY --from=python-builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=python-builder /usr/local/bin/uv /usr/local/bin/uv
+COPY --from=python-builder /usr/local/bin /usr/local/bin
 
-# Copy application code
+# Copy application code and models
 COPY scripts/ ./scripts/
+COPY models/ ./models/
 
 # Copy the built React frontend (served by FastAPI at / when present)
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
-# Create directories for persistent data
+# Create directories for persistent data and copy fallback models
 RUN mkdir -p /data /models /var/log/ledgerflow && \
+    cp -r ./models/* /models/ 2>/dev/null || true && \
     chown -R ledgerflow:ledgerflow /app /data /models /var/log/ledgerflow
 
 # Copy entrypoint and cron config

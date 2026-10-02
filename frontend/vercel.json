@@ -2,12 +2,20 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
-      "source": "/(reports|stats|transactions|health)/:path*",
-      "destination": "https://YOUR-BACKEND-URL.fly.dev/$1/:path*"
+      "source": "/reports/:path*",
+      "destination": "https://ledgerflow.onrender.com/reports/:path*"
     },
     {
-      "source": "/(reports|stats|transactions|health)",
-      "destination": "https://YOUR-BACKEND-URL.fly.dev/$1"
+      "source": "/stats/:path*",
+      "destination": "https://ledgerflow.onrender.com/stats/:path*"
+    },
+    {
+      "source": "/transactions/:path*",
+      "destination": "https://ledgerflow.onrender.com/transactions/:path*"
+    },
+    {
+      "source": "/health",
+      "destination": "https://ledgerflow.onrender.com/health"
     },
     {
       "source": "/(.*)",
