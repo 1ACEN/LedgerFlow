@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { TABS, PORTED_TABS } from './lib/tabs';
-import NotPortedPanel from './components/NotPortedPanel';
+import { TABS } from './lib/tabs';
 import ArAgingTab from './features/ar-aging/ArAgingTab';
 import RevenueTab from './features/revenue/RevenueTab';
 import CashflowTab from './features/cashflow/CashflowTab';
@@ -50,7 +49,7 @@ export default function App() {
               <span>Live Stream</span>
             </div>
             <button className="refresh-btn" onClick={handleRefresh} title="Refresh current tab">
-              🔄 Refresh
+              Refresh
             </button>
             <a
               href="/docs"
@@ -70,30 +69,19 @@ export default function App() {
               className={'tab-btn' + (tab.id === activeTab ? ' active' : '')}
               onClick={() => setActiveTab(tab.id)}
             >
-              {tab.icon} {tab.label}
+              {tab.label}
             </button>
           ))}
         </nav>
       </header>
 
       <main className="layout">
-        {PORTED_TABS.has(activeTab) ? (
-          activeTab === 'ar-aging' ? (
-            <ArAgingTab refreshKey={refreshKey} />
-          ) : activeTab === 'revenue' ? (
-            <RevenueTab refreshKey={refreshKey} />
-          ) : activeTab === 'cashflow' ? (
-            <CashflowTab refreshKey={refreshKey} />
-          ) : activeTab === 'executive' ? (
-            <ExecutiveTab refreshKey={refreshKey} />
-          ) : activeTab === 'ops' ? (
-            <OpsTab refreshKey={refreshKey} />
-          ) : activeTab === 'live-pipeline' ? (
-            <LivePipelineTab refreshKey={refreshKey} />
-          ) : null
-        ) : (
-          <NotPortedPanel tabId={activeTab} />
-        )}
+        {activeTab === 'ar-aging' && <ArAgingTab refreshKey={refreshKey} />}
+        {activeTab === 'revenue' && <RevenueTab refreshKey={refreshKey} />}
+        {activeTab === 'cashflow' && <CashflowTab refreshKey={refreshKey} />}
+        {activeTab === 'executive' && <ExecutiveTab refreshKey={refreshKey} />}
+        {activeTab === 'ops' && <OpsTab refreshKey={refreshKey} />}
+        {activeTab === 'live-pipeline' && <LivePipelineTab refreshKey={refreshKey} />}
       </main>
     </div>
   );

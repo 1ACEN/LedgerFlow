@@ -317,12 +317,12 @@ One dashboard at `http://localhost:8080` with tabbed views covering every financ
 
 | Tab | Audience | Data freshness |
 |-----|----------|----------------|
-| ⚡ Live Pipeline | Payments engineers, risk team | Real-time (webhook-driven) |
-| 📈 Executive Overview | CFO, CEO, board | Daily |
-| 🔮 Cash Flow & Forecast | Treasurer, controller | Daily (nightly cron) |
-| 📊 CFO & Revenue | CFO, FP&A | Monthly |
-| 🛡️ Fintech Ops & AI | Payments engineers, risk team | Real-time |
-| 📑 AR Aging | Collections / finance | Daily |
+| Live Pipeline | Payments engineers, risk team | Real-time (webhook-driven) |
+| Executive Overview | CFO, CEO, board | Daily |
+| Cash Flow & Forecast | Treasurer, controller | Daily (nightly cron) |
+| CFO & Revenue | CFO, FP&A | Monthly |
+| Fintech Ops & AI | Payments engineers, risk team | Real-time |
+| AR Aging | Collections / finance | Daily |
 
 It also provides a **manual transaction input form** and a **live streaming feed**, plus a REST API (`/docs` for OpenAPI docs) for webhooks and reports.
 

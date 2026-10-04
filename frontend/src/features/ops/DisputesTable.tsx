@@ -22,13 +22,13 @@ export const DisputesTable: React.FC<DisputesTableProps> = ({ disputes }) => {
   const getStatusBadge = (status: string) => {
     const s = (status || '').toLowerCase();
     if (s.includes('won')) {
-      return <span className="badge-pill high">Won ✅</span>;
+      return <span className="badge-pill high">Won</span>;
     }
     if (s.includes('lost')) {
-      return <span className="badge-pill low">Lost ❌</span>;
+      return <span className="badge-pill low">Lost</span>;
     }
     if (s.includes('needs_response')) {
-      return <span className="badge-pill med">Needs Response ⏳</span>;
+      return <span className="badge-pill med">Needs Response</span>;
     }
     return <span className="badge-pill" style={{ background: 'var(--cyan-soft)', color: 'var(--cyan)' }}>{status}</span>;
   };
@@ -36,7 +36,7 @@ export const DisputesTable: React.FC<DisputesTableProps> = ({ disputes }) => {
   return (
     <div className="card animate-in stagger-4">
       <div className="card-header">
-        <div className="card-icon yellow">⚖️</div>
+        <div className="card-icon yellow"></div>
         <div>
           <span className="card-title">Chargebacks & Disputes Queue</span>
           <span className="card-subtitle" style={{ display: 'block' }}>

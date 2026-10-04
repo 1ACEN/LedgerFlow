@@ -87,7 +87,7 @@ export const SuccessTrendChart: React.FC<SuccessTrendChartProps> = ({ trend }) =
   return (
     <div className="card animate-in stagger-2">
       <div className="card-header">
-        <div className="card-icon cyan">🛡️</div>
+        <div className="card-icon cyan"></div>
         <div>
           <span className="card-title">Gateway Success Rate Trends</span>
           <span className="card-subtitle" style={{ display: 'block' }}>

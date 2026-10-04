@@ -52,7 +52,7 @@ export const ManualTransactionForm: React.FC<ManualTransactionFormProps> = ({
   return (
     <div className="card animate-in stagger-2">
       <div className="card-header">
-        <div className="card-icon blue">✏️</div>
+        <div className="card-icon blue"></div>
         <div>
           <span className="card-title">Live Manual Transaction Input</span>
           <span className="card-subtitle" style={{ display: 'block' }}>
@@ -78,7 +78,7 @@ export const ManualTransactionForm: React.FC<ManualTransactionFormProps> = ({
               fontWeight: 500,
             }}
           >
-            <span>{submitResult.success ? '✅' : '❌'} {submitResult.message}</span>
+            <span>{submitResult.message}</span>
             <button
               onClick={onDismissResult}
               style={{
@@ -90,7 +90,7 @@ export const ManualTransactionForm: React.FC<ManualTransactionFormProps> = ({
                 lineHeight: 1,
               }}
             >
-              ✕
+              x
             </button>
           </div>
         )}
@@ -186,9 +186,9 @@ export const ManualTransactionForm: React.FC<ManualTransactionFormProps> = ({
                   fontSize: 13,
                 }}
               >
-                <option value="succeeded">Succeeded ✅</option>
-                <option value="failed">Failed ❌</option>
-                <option value="pending">Pending ⏳</option>
+                <option value="succeeded">Succeeded</option>
+                <option value="failed">Failed</option>
+                <option value="pending">Pending</option>
                 <option value="canceled">Canceled</option>
               </select>
             </div>
@@ -378,7 +378,7 @@ export const ManualTransactionForm: React.FC<ManualTransactionFormProps> = ({
               boxShadow: '0 0 16px var(--accent-glow)',
             }}
           >
-            {submitting ? 'Ingesting…' : '➕ Ingest Live Transaction'}
+            {submitting ? 'Ingesting…' : 'Ingest Live Transaction'}
           </button>
         </form>
       </div>

@@ -269,47 +269,21 @@ def _demo_stream_loop():
 
 
 # =============================================================================
-# SERVE LIVE INPUT UI
+# SERVE REACT DASHBOARD UI
 # =============================================================================
 
-_UI_PATH = Path(__file__).parent / "live_input.html"
 _FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 async def root():
-    """Serve the dashboard UI.
-
-    Serves the built React app (frontend/dist) when present, otherwise falls
-    back to the classic self-contained dashboard (scripts/api/live_input.html).
-    """
-    # No-store so the browser never serves a stale cached copy of the UI —
-    # otherwise edits to the dashboard are invisible to users (the HTML is
-    # small and regenerated on every request anyway).
+    """Serve the React dashboard UI from frontend/dist."""
     headers = {"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"}
     react_index = _FRONTEND_DIST / "index.html"
     if react_index.exists():
         return HTMLResponse(content=react_index.read_text(encoding="utf-8"), headers=headers)
-    if _UI_PATH.exists():
-        return HTMLResponse(content=_UI_PATH.read_text(encoding="utf-8"), headers=headers)
     return HTMLResponse(
-        content="<p>Dashboard UI not found. Check <code>frontend/dist</code> or <code>scripts/api/live_input.html</code>.</p>",
-        headers=headers,
-    )
-
-
-@app.get("/legacy", response_class=HTMLResponse, include_in_schema=False)
-async def legacy_dashboard():
-    """Serve the classic self-contained dashboard.
-
-    Kept reachable while the React migration is in progress: tabs that are not
-    yet ported link back here. The classic vanilla shell still supports all 6 tabs.
-    """
-    headers = {"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"}
-    if _UI_PATH.exists():
-        return HTMLResponse(content=_UI_PATH.read_text(encoding="utf-8"), headers=headers)
-    return HTMLResponse(
-        content="<p>Legacy dashboard not found. Check <code>scripts/api/live_input.html</code>.</p>",
+        content="<p>Dashboard UI not found. Build the frontend via <code>cd frontend && npm run build</code>.</p>",
         headers=headers,
     )
 
@@ -570,6 +544,7 @@ async def report_cashflow():
                     p50_inflows_usd,
                     p50_outflows_usd
                 FROM analytics.forecasts
+                WHERE forecast_date = (SELECT MAX(forecast_date) FROM analytics.forecasts)
                 ORDER BY prediction_date
             """).fetchall()
 
@@ -598,18 +573,60 @@ async def report_cashflow():
                 )
             )
 
+        forecast_list = [
+            {
+                "date": str(r[0]),
+                "p10": round(r[1] or 0, 2),
+                "p50": round(r[2] or 0, 2),
+                "p90": round(r[3] or 0, 2),
+                "inflows": round(r[4] or 0, 2),
+                "outflows": round(r[5] or 0, 2),
+            }
+            for r in forecast
+        ]
+
+        # If no ML forecast has been run yet, generate baseline projection from daily cash position
+        if not forecast_list:
+            try:
+                with _db_lock:
+                    conn = get_conn(DUCKDB_PATH)
+                    last_pos = conn.execute("""
+                        SELECT date, cumulative_cash_usd
+                        FROM analytics.daily_cash_position
+                        ORDER BY date DESC
+                        LIMIT 1
+                    """).fetchone()
+                    if last_pos and last_pos[0]:
+                        from datetime import timedelta
+
+                        last_d, cur_c = last_pos[0], float(last_pos[1] or 0.0)
+                        avg_flow = conn.execute("""
+                            SELECT AVG(net_flow_usd) FROM (
+                                SELECT net_flow_usd FROM analytics.daily_cash_position
+                                ORDER BY date DESC LIMIT 30
+                            )
+                        """).fetchone()[0] or 0.0
+                        daily_flow = float(avg_flow)
+                        running_c = cur_c
+                        for day_i in range(1, 92):
+                            pred_d = last_d + timedelta(days=day_i)
+                            running_c += daily_flow
+                            cone = abs(running_c) * 0.015 * (day_i / 14.0)
+                            forecast_list.append(
+                                {
+                                    "date": str(pred_d),
+                                    "p10": round(running_c - cone, 2),
+                                    "p50": round(running_c, 2),
+                                    "p90": round(running_c + cone, 2),
+                                    "inflows": round(max(0.0, daily_flow), 2),
+                                    "outflows": round(max(0.0, -daily_flow), 2),
+                                }
+                            )
+            except Exception:
+                pass
+
         return {
-            "forecast": [
-                {
-                    "date": str(r[0]),
-                    "p10": round(r[1] or 0, 2),
-                    "p50": round(r[2] or 0, 2),
-                    "p90": round(r[3] or 0, 2),
-                    "inflows": round(r[4] or 0, 2),
-                    "outflows": round(r[5] or 0, 2),
-                }
-                for r in forecast
-            ],
+            "forecast": forecast_list,
             "weekly": weekly,
         }
     except Exception as e:

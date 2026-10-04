@@ -37,7 +37,7 @@ export const RetryAdvisorTable: React.FC<RetryAdvisorTableProps> = ({ rows }) =>
         style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div className="card-icon purple">🤖</div>
+          <div className="card-icon purple"></div>
           <div>
             <span className="card-title">AI Decline Retry Advisor (ML Smart Routing Recommendations)</span>
             <span className="card-subtitle" style={{ display: 'block' }}>

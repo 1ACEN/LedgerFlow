@@ -98,7 +98,7 @@ export default function RevenueProductBars({ rows }: Props) {
   return (
     <div className="card animate-in stagger-2">
       <div className="card-header">
-        <div className="card-icon blue">📊</div>
+        <div className="card-icon blue"></div>
         <span className="card-title">Monthly Revenue by Product Line</span>
         <span className="card-subtitle">stacked gross revenue across lines</span>
       </div>

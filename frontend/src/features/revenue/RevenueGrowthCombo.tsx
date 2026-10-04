@@ -111,7 +111,7 @@ export default function RevenueGrowthCombo({ rows }: Props) {
   return (
     <div className="card animate-in stagger-3">
       <div className="card-header">
-        <div className="card-icon green">📈</div>
+        <div className="card-icon green"></div>
         <span className="card-title">Revenue &amp; MoM Growth Rate</span>
         <span className="card-subtitle">revenue (left) vs growth % (right)</span>
       </div>

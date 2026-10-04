@@ -9,7 +9,7 @@ export default function WeeklyFlowTable({ weekly }: Props) {
   return (
     <div className="card animate-in stagger-4">
       <div className="card-header">
-        <div className="card-icon green">📋</div>
+        <div className="card-icon green"></div>
         <span className="card-title">Historical Weekly Cash Breakdown</span>
         <span className="card-subtitle">inflows vs outflows · rolling 12 weeks</span>
       </div>

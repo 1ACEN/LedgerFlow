@@ -35,7 +35,6 @@ export default function RevenueTab({ refreshKey }: Props) {
       <div className="card animate-in">
         <div className="card-body">
           <div className="empty-state">
-            <div className="empty-state-icon">⚠️</div>
             <div className="empty-state-title">Failed to load CFO &amp; Revenue report</div>
             <div className="empty-state-desc">{error}</div>
             <button
@@ -43,7 +42,7 @@ export default function RevenueTab({ refreshKey }: Props) {
               onClick={() => setReloadCount((c) => c + 1)}
               style={{ width: 'fit-content', marginTop: '12px' }}
             >
-              Try Again 🔄
+              Try Again
             </button>
           </div>
         </div>
@@ -55,7 +54,7 @@ export default function RevenueTab({ refreshKey }: Props) {
     return (
       <div className="card animate-in">
         <div className="card-header">
-          <div className="card-icon blue">📊</div>
+          <div className="card-icon blue"></div>
           <span className="card-title">CFO &amp; Revenue Analytics</span>
         </div>
         <div className="card-body">

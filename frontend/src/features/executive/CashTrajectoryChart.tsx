@@ -101,7 +101,7 @@ export const CashTrajectoryChart: React.FC<CashTrajectoryChartProps> = ({ trend 
   return (
     <div className="card animate-in stagger-3">
       <div className="card-header">
-        <div className="card-icon blue">📈</div>
+        <div className="card-icon blue"></div>
         <div>
           <span className="card-title">30-Day Cumulative Cash Trajectory</span>
           <span className="card-subtitle" style={{ display: 'block' }}>

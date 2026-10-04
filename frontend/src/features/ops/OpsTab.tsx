@@ -16,7 +16,6 @@ export const OpsTab: React.FC<OpsTabProps> = ({ refreshKey }) => {
   if (error) {
     return (
       <div className="card" style={{ padding: 24, textAlign: 'center', borderColor: 'var(--red)' }}>
-        <div style={{ fontSize: 32, marginBottom: 8 }}>⚠️</div>
         <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--red)', marginBottom: 6 }}>
           Failed to load Fintech Ops & AI Analytics
         </div>
@@ -28,7 +27,7 @@ export const OpsTab: React.FC<OpsTabProps> = ({ refreshKey }) => {
           onClick={refetch}
           style={{ display: 'inline-flex', margin: '0 auto' }}
         >
-          🔄 Try Again
+          Try Again
         </button>
       </div>
     );

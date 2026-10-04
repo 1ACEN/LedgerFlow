@@ -11,7 +11,7 @@ export default function IncomeStatementTable({ rows }: Props) {
   return (
     <div className="card animate-in stagger-4" style={{ marginTop: '16px' }}>
       <div className="card-header">
-        <div className="card-icon cyan">📑</div>
+        <div className="card-icon cyan"></div>
         <span className="card-title">Monthly Income Statement (Revenue &amp; P&amp;L)</span>
         <span className="card-subtitle">net vs gross · product-line split with subtotals</span>
       </div>

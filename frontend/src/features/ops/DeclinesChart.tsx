@@ -62,7 +62,7 @@ export const DeclinesChart: React.FC<DeclinesChartProps> = ({ declines }) => {
   return (
     <div className="card animate-in stagger-1">
       <div className="card-header">
-        <div className="card-icon yellow">📉</div>
+        <div className="card-icon yellow"></div>
         <div>
           <span className="card-title">Top Payment Decline Reasons</span>
           <span className="card-subtitle" style={{ display: 'block' }}>

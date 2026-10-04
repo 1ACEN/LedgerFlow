@@ -67,7 +67,7 @@ export default function RevenueMixChart({ rows }: Props) {
   return (
     <div className="card animate-in stagger-2">
       <div className="card-header">
-        <div className="card-icon purple">🍩</div>
+        <div className="card-icon purple"></div>
         <span className="card-title">Product Line Revenue Mix</span>
         <span className="card-subtitle">TTM dollar &amp; share breakdown</span>
       </div>

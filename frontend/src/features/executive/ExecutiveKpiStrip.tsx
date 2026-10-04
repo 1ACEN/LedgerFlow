@@ -38,7 +38,6 @@ export const ExecutiveKpiStrip: React.FC<ExecutiveKpiStripProps> = ({ kpis, load
         <div className="metric-card animate-in stagger-1">
           <div className="metric-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>Current Cash Balance</span>
-            <span style={{ fontSize: 14 }}>🏦</span>
           </div>
           <div className="metric-value" style={{ color: 'var(--green)' }}>
             {fmtUsd(kpis.currentCash)}
@@ -46,7 +45,7 @@ export const ExecutiveKpiStrip: React.FC<ExecutiveKpiStripProps> = ({ kpis, load
           <div className="metric-sub" style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span>Treasury + Operating</span>
             <span style={{ color: isPositiveNet ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>
-              {isPositiveNet ? '▲ +' : '▼ -'}
+              {isPositiveNet ? '+' : '-'}
               {fmtUsd(Math.abs(kpis.net30dChange))} (30d)
             </span>
           </div>
@@ -77,7 +76,6 @@ export const ExecutiveKpiStrip: React.FC<ExecutiveKpiStripProps> = ({ kpis, load
         <div className="metric-card animate-in stagger-3">
           <div className="metric-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>Daily Outflow (30d avg)</span>
-            <span style={{ fontSize: 14 }}>🔥</span>
           </div>
           <div className="metric-value" style={{ color: 'var(--yellow)' }}>
             {fmtUsd(kpis.dailyOutflow)}
@@ -91,7 +89,6 @@ export const ExecutiveKpiStrip: React.FC<ExecutiveKpiStripProps> = ({ kpis, load
         <div className="metric-card animate-in stagger-4">
           <div className="metric-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>Gateway Success Rate</span>
-            <span style={{ fontSize: 14 }}>⚡</span>
           </div>
           <div className="metric-value" style={{ color: 'var(--purple)' }}>
             {kpis.gatewaySuccessRate > 0 ? `${kpis.gatewaySuccessRate}%` : '—'}

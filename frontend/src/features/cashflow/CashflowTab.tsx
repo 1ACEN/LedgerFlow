@@ -34,7 +34,6 @@ export default function CashflowTab({ refreshKey }: Props) {
       <div className="card animate-in">
         <div className="card-body">
           <div className="empty-state">
-            <div className="empty-state-icon">⚠️</div>
             <div className="empty-state-title">Failed to load Cash Flow &amp; Forecast</div>
             <div className="empty-state-desc">{error}</div>
             <button
@@ -42,7 +41,7 @@ export default function CashflowTab({ refreshKey }: Props) {
               onClick={() => setReloadCount((c) => c + 1)}
               style={{ width: 'fit-content', marginTop: '12px' }}
             >
-              Try Again 🔄
+              Try Again
             </button>
           </div>
         </div>
@@ -54,7 +53,7 @@ export default function CashflowTab({ refreshKey }: Props) {
     return (
       <div className="card animate-in">
         <div className="card-header">
-          <div className="card-icon purple">🔮</div>
+          <div className="card-icon purple"></div>
           <span className="card-title">Cash Flow &amp; Predictive Forecasting</span>
         </div>
         <div className="card-body">

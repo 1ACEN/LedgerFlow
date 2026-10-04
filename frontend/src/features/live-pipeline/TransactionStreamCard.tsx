@@ -21,20 +21,20 @@ export const TransactionStreamCard: React.FC<TransactionStreamCardProps> = ({
   pollingEnabled,
   onTogglePolling,
 }) => {
-  const getTypeIcon = (type: string) => {
+  const getTypeTag = (type: string) => {
     switch (type) {
       case 'refund':
-        return '↩️';
+        return 'REF';
       case 'payout':
-        return '💸';
+        return 'PAY';
       case 'invoice_payment':
-        return '📑';
+        return 'INV';
       case 'fee':
-        return '🏷️';
+        return 'FEE';
       case 'transfer':
-        return '🔄';
+        return 'TRF';
       default:
-        return '💳';
+        return 'CHG';
     }
   };
 
@@ -45,7 +45,7 @@ export const TransactionStreamCard: React.FC<TransactionStreamCardProps> = ({
         style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div className="card-icon purple">⚡</div>
+          <div className="card-icon purple"></div>
           <div>
             <span className="card-title">Real-Time Transaction Stream</span>
             <span className="card-subtitle" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -84,14 +84,13 @@ export const TransactionStreamCard: React.FC<TransactionStreamCardProps> = ({
           }}
           title={pollingEnabled ? 'Pause live polling' : 'Resume live stream'}
         >
-          {pollingEnabled ? '⏸ Pause Stream' : '▶ Resume Stream'}
+          {pollingEnabled ? 'Pause Stream' : 'Resume Stream'}
         </button>
       </div>
 
       <div className="card-body" style={{ flex: 1, padding: '12px 16px', overflowY: 'auto', maxHeight: 600 }}>
         {transactions.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-state-icon">⚡</div>
             <div className="empty-state-title">Awaiting real-time feed…</div>
             <div className="empty-state-desc">Transactions will appear here as they arrive</div>
           </div>
@@ -128,11 +127,13 @@ export const TransactionStreamCard: React.FC<TransactionStreamCardProps> = ({
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: 16,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: 'var(--text-secondary)',
                       flexShrink: 0,
                     }}
                   >
-                    {getTypeIcon(t.type)}
+                    {getTypeTag(t.type)}
                   </div>
 
                   <div className="feed-info" style={{ flex: 1, minWidth: 0 }}>

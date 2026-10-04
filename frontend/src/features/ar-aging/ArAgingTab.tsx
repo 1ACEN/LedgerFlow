@@ -34,7 +34,6 @@ export default function ArAgingTab({ refreshKey }: Props) {
       <div className="card animate-in">
         <div className="card-body">
           <div className="empty-state">
-            <div className="empty-state-icon">⚠️</div>
             <div className="empty-state-title">Failed to load AR aging</div>
             <div className="empty-state-desc">{error}</div>
             <button
@@ -42,7 +41,7 @@ export default function ArAgingTab({ refreshKey }: Props) {
               onClick={() => setReloadCount((c) => c + 1)}
               style={{ width: 'fit-content', marginTop: '12px' }}
             >
-              Try Again 🔄
+              Try Again
             </button>
           </div>
         </div>
@@ -54,7 +53,7 @@ export default function ArAgingTab({ refreshKey }: Props) {
     return (
       <div className="card animate-in">
         <div className="card-header">
-          <div className="card-icon green">📑</div>
+          <div className="card-icon green"></div>
           <span className="card-title">Accounts Receivable Aging Report</span>
         </div>
         <div className="card-body">
@@ -76,7 +75,7 @@ export default function ArAgingTab({ refreshKey }: Props) {
 
       <div className="card animate-in" style={{ marginTop: '16px' }}>
         <div className="card-header">
-          <div className="card-icon green">📑</div>
+          <div className="card-icon green"></div>
           <span className="card-title">Accounts Receivable Aging Report</span>
           <span className="card-subtitle">
             Accrual Basis Outstanding Invoices · rows colored by severity

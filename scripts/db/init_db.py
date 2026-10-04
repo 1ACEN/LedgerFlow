@@ -260,6 +260,7 @@ SELECT
     feature_set_version,
     created_at
 FROM ml.cash_flow_forecast
+WHERE forecast_date = (SELECT MAX(forecast_date) FROM ml.cash_flow_forecast)
 ORDER BY prediction_date;
 
 -- AR Aging (simplified - assumes invoice_payment type with terms)

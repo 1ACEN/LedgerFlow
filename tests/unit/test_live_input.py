@@ -143,7 +143,12 @@ class TestAPIEndpoints:
     """Tests for FastAPI live data and webhook endpoints."""
 
     @pytest.fixture
-    def client(self):
+    def client(self, tmp_path, monkeypatch):
+        db_path = tmp_path / "test.duckdb"
+        conn = duckdb.connect(str(db_path))
+        conn.execute(SCHEMA_SQL)
+        conn.close()
+        monkeypatch.setattr("scripts.api.webhooks.DUCKDB_PATH", db_path)
         return TestClient(app)
 
     def test_health_endpoint(self, client):
@@ -197,14 +202,6 @@ class TestAPIEndpoints:
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
         assert "no-store" in response.headers.get("cache-control", "")
-
-    def test_legacy_dashboard_endpoint(self, client):
-        """Verify GET /legacy serves classic dashboard HTML with no-store cache headers."""
-        response = client.get("/legacy")
-        assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
-        assert "no-store" in response.headers.get("cache-control", "")
-        assert "Ledger" in response.text
 
     def test_ar_aging_report_endpoint(self, client):
         """Verify GET /reports/ar-aging returns accounts receivable aging report."""

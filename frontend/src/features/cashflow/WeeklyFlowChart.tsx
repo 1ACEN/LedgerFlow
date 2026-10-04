@@ -9,7 +9,17 @@ interface Props {
 }
 
 export default function WeeklyFlowChart({ weekly }: Props) {
+  const hasData = Array.isArray(weekly) && weekly.length > 0;
+
   const config = useMemo<ChartConfiguration>(() => {
+    if (!hasData) {
+      return {
+        type: 'bar',
+        data: { labels: [], datasets: [] },
+        options: { responsive: true, maintainAspectRatio: false },
+      };
+    }
+
     return {
       type: 'bar',
       data: {
@@ -52,6 +62,10 @@ export default function WeeklyFlowChart({ weekly }: Props) {
               font: { size: 10 },
               callback: (v: number | string) => {
                 const num = typeof v === 'number' ? v : parseFloat(v);
+                if (isNaN(num)) return '$0';
+                if (Math.abs(num) >= 1_000_000) {
+                  return '$' + (num / 1_000_000).toFixed(2) + 'M';
+                }
                 return '$' + (num / 1000).toFixed(0) + 'k';
               },
             },
@@ -60,12 +74,12 @@ export default function WeeklyFlowChart({ weekly }: Props) {
         },
       },
     };
-  }, [weekly]);
+  }, [weekly, hasData]);
 
   return (
     <div className="card animate-in stagger-3">
       <div className="card-header">
-        <div className="card-icon blue">📅</div>
+        <div className="card-icon blue"></div>
         <span className="card-title">Weekly Net Cash Flow Trends</span>
         <span className="card-subtitle">operating net cash per week</span>
       </div>

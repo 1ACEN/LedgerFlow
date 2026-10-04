@@ -38,7 +38,6 @@ export const LiveKpiStrip: React.FC<LiveKpiStripProps> = ({ kpis, loading }) => 
       <div className="metric-card animate-in stagger-1">
         <div className="metric-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>Total Transactions</span>
-          <span style={{ fontSize: 14 }}>💾</span>
         </div>
         <div className="metric-value" style={{ color: 'var(--accent)' }}>
           {kpis.totalTransactions > 0 ? kpis.totalTransactions.toLocaleString() : '—'}
@@ -50,7 +49,6 @@ export const LiveKpiStrip: React.FC<LiveKpiStripProps> = ({ kpis, loading }) => 
       <div className="metric-card animate-in stagger-2">
         <div className="metric-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>Today's Ingested Volume</span>
-          <span style={{ fontSize: 14 }}>📈</span>
         </div>
         <div className="metric-value" style={{ color: 'var(--green)' }}>
           {kpis.todayVolume.toLocaleString()}
@@ -64,7 +62,6 @@ export const LiveKpiStrip: React.FC<LiveKpiStripProps> = ({ kpis, loading }) => 
       <div className="metric-card animate-in stagger-3">
         <div className="metric-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>Live Success Rate</span>
-          <span style={{ fontSize: 14 }}>⚡</span>
         </div>
         <div className="metric-value" style={{ color: 'var(--yellow)' }}>
           {kpis.liveSuccessRate != null ? `${kpis.liveSuccessRate}%` : '—'}
@@ -76,7 +73,6 @@ export const LiveKpiStrip: React.FC<LiveKpiStripProps> = ({ kpis, loading }) => 
       <div className="metric-card animate-in stagger-4">
         <div className="metric-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>Last Ingested Event</span>
-          <span style={{ fontSize: 14 }}>🕒</span>
         </div>
         <div
           className="metric-value"

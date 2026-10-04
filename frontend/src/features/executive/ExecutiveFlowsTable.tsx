@@ -20,7 +20,7 @@ export const ExecutiveFlowsTable: React.FC<ExecutiveFlowsTableProps> = ({ trend 
   return (
     <div className="card animate-in stagger-4" style={{ marginTop: 20 }}>
       <div className="card-header">
-        <div className="card-icon cyan">📑</div>
+        <div className="card-icon cyan"></div>
         <div>
           <span className="card-title">30-Day Liquidity & Cash Flow Ledger</span>
           <span className="card-subtitle" style={{ display: 'block' }}>

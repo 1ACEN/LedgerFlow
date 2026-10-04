@@ -64,7 +64,7 @@ export default function ArBucketChart({ aging }: Props) {
   return (
     <div className="card animate-in stagger-2">
       <div className="card-header">
-        <div className="card-icon red">📊</div>
+        <div className="card-icon red"></div>
         <span className="card-title">AR Outstanding by Aging Bucket</span>
         <span className="card-subtitle">dollar concentration per bucket</span>
       </div>

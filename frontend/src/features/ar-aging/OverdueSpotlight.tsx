@@ -13,14 +13,13 @@ export default function OverdueSpotlight({ aging }: Props) {
   return (
     <div className="card animate-in stagger-1">
       <div className="card-header">
-        <div className="card-icon red">🚨</div>
+        <div className="card-icon red"></div>
         <span className="card-title">Top Overdue Customers</span>
         <span className="card-subtitle">highest 90+ day balances</span>
       </div>
       <div className="card-body" style={{ padding: 0 }}>
         {overdues.length === 0 ? (
           <div className="empty-state" style={{ padding: '32px' }}>
-            <div className="empty-state-icon">✅</div>
             <div className="empty-state-title">No 90+ day overdue balances</div>
             <div className="empty-state-desc">
               All receivables are within acceptable aging buckets

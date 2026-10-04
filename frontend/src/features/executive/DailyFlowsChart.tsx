@@ -108,7 +108,7 @@ export const DailyFlowsChart: React.FC<DailyFlowsChartProps> = ({ trend }) => {
   return (
     <div className="card animate-in stagger-4">
       <div className="card-header">
-        <div className="card-icon green">📊</div>
+        <div className="card-icon green"></div>
         <div>
           <span className="card-title">Daily Inflows vs Outflows</span>
           <span className="card-subtitle" style={{ display: 'block' }}>

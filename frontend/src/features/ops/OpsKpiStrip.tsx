@@ -35,7 +35,6 @@ export const OpsKpiStrip: React.FC<OpsKpiStripProps> = ({ kpis, loading }) => {
       <div className="metric-card animate-in stagger-1">
         <div className="metric-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>Total Declines Logged</span>
-          <span style={{ fontSize: 14 }}>📉</span>
         </div>
         <div className="metric-value" style={{ color: 'var(--red)' }}>
           {kpis.totalDeclines.toLocaleString()}
@@ -52,7 +51,6 @@ export const OpsKpiStrip: React.FC<OpsKpiStripProps> = ({ kpis, loading }) => {
       <div className="metric-card animate-in stagger-2">
         <div className="metric-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>Avg Gateway Success Rate</span>
-          <span style={{ fontSize: 14 }}>🛡️</span>
         </div>
         <div className="metric-value" style={{ color: 'var(--green)' }}>
           {kpis.avgSuccessRate > 0 ? `${kpis.avgSuccessRate}%` : '—'}
@@ -66,7 +64,6 @@ export const OpsKpiStrip: React.FC<OpsKpiStripProps> = ({ kpis, loading }) => {
       <div className="metric-card animate-in stagger-3">
         <div className="metric-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>AI Predicted Recovery</span>
-          <span style={{ fontSize: 14 }}>🤖</span>
         </div>
         <div className="metric-value" style={{ color: 'var(--purple)' }}>
           {fmtUsd(kpis.potentialRecoveryUsd)}
@@ -80,7 +77,6 @@ export const OpsKpiStrip: React.FC<OpsKpiStripProps> = ({ kpis, loading }) => {
       <div className="metric-card animate-in stagger-4">
         <div className="metric-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>Disputes Exposure</span>
-          <span style={{ fontSize: 14 }}>⚖️</span>
         </div>
         <div className="metric-value" style={{ color: 'var(--yellow)' }}>
           {fmtUsd(kpis.totalDisputeAmount)}
