@@ -600,12 +600,15 @@ async def report_cashflow():
                         from datetime import timedelta
 
                         last_d, cur_c = last_pos[0], float(last_pos[1] or 0.0)
-                        avg_flow = conn.execute("""
+                        avg_flow = (
+                            conn.execute("""
                             SELECT AVG(net_flow_usd) FROM (
                                 SELECT net_flow_usd FROM analytics.daily_cash_position
                                 ORDER BY date DESC LIMIT 30
                             )
-                        """).fetchone()[0] or 0.0
+                        """).fetchone()[0]
+                            or 0.0
+                        )
                         daily_flow = float(avg_flow)
                         running_c = cur_c
                         for day_i in range(1, 92):
