@@ -36,14 +36,11 @@ export const RetryAdvisorTable: React.FC<RetryAdvisorTableProps> = ({ rows }) =>
         className="card-header"
         style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div className="card-icon purple"></div>
-          <div>
-            <span className="card-title">AI Decline Retry Advisor (ML Smart Routing Recommendations)</span>
-            <span className="card-subtitle" style={{ display: 'block' }}>
-              LightGBM model predictions for highest-yield payment recovery actions
-            </span>
-          </div>
+        <div>
+          <span className="card-title">AI Decline Retry Advisor (ML Smart Routing Recommendations)</span>
+          <span className="card-subtitle" style={{ display: 'block' }}>
+            LightGBM model predictions for highest-yield payment recovery actions
+          </span>
         </div>
 
         {/* Filter Controls */}

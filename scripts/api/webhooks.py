@@ -138,6 +138,33 @@ async def startup_event():
 
                 conn.execute(SCHEMA_SQL)
                 console.log("[green]Schema initialized.[/green]")
+            else:
+                # Ensure historical outflows have realistic negative net amounts and cash basis
+                conn.execute("""
+                    UPDATE transactions
+                    SET net_amount = -abs(net_amount)
+                    WHERE type IN ('refund', 'payout', 'fee')
+                      AND net_amount > 0;
+                """)
+                conn.execute("""
+                    UPDATE transactions
+                    SET basis = 'cash'
+                    WHERE type IN ('payout', 'fee')
+                      AND basis != 'cash';
+                """)
+                # Also ensure forecast table has realistic p50_outflows_usd
+                try:
+                    conn.execute("""
+                        UPDATE ml.cash_flow_forecast
+                        SET p50_outflows_usd = (
+                            SELECT ROUND(AVG(outflows_usd), 2)
+                            FROM analytics.daily_cash_position
+                            WHERE outflows_usd > 0
+                        )
+                        WHERE p50_outflows_usd = 0 OR p50_outflows_usd IS NULL;
+                    """)
+                except Exception:
+                    pass
     except Exception as e:
         console.log(f"[red]Startup DB check failed: {e}[/red]")
 
@@ -157,7 +184,7 @@ async def startup_event():
 # DEMO STREAM
 # =============================================================================
 
-_DEMO_TYPES = ["charge", "charge", "charge", "refund", "payout", "invoice_payment", "charge"]
+_DEMO_TYPES = ["charge", "charge", "charge", "refund", "payout", "fee", "invoice_payment"]
 _DEMO_STATUSES_WEIGHTED = {
     "succeeded": 80,
     "failed": 12,
@@ -202,7 +229,14 @@ def _build_demo_transaction() -> dict:
         fee_amount = int(amount_cents * 0.029 + 30)
     elif txn_type == "refund":
         fee_amount = -int(amount_cents * 0.029)
-    net_amount = amount_cents - fee_amount if txn_type == "charge" else amount_cents
+
+    # Net amount: positive for charges, negative for outflows (payout, refund, fee)
+    if txn_type in ("refund", "payout", "fee"):
+        net_amount = -amount_cents
+    elif txn_type == "charge" and status == "succeeded":
+        net_amount = amount_cents - fee_amount
+    else:
+        net_amount = amount_cents
 
     decline_code = None
     if status == "failed" and txn_type == "charge":
@@ -215,6 +249,28 @@ def _build_demo_transaction() -> dict:
         "ecommerce": "4300-revenue",
         "platform_fees": "4400-revenue",
     }
+
+    # Realistic descriptions for outflows vs charges
+    if txn_type == "payout":
+        desc = random.choice([
+            "Cloud Infrastructure — AWS us-east-1",
+            "Vendor Disbursement — Datadog",
+            "Contractor Services — Dev & Ops",
+            "Merchant Payout — Bank Account *4821",
+            "SaaS Licensing — GitHub / Slack",
+        ])
+    elif txn_type == "refund":
+        desc = f"Refund — {product_line.replace('_', ' ').title()}"
+    elif txn_type == "fee":
+        desc = f"Payment Processing Fee — {source.upper()}"
+    else:
+        desc = f"Demo {txn_type} — {product_line.replace('_', ' ').title()}"
+
+    # Payouts and fees are primarily cash movements
+    if txn_type in ("payout", "refund", "fee"):
+        basis = "cash" if random.random() < 0.85 else "accrual"
+    else:
+        basis = random.choice(["cash", "accrual"])
 
     row = {
         "transaction_id": f"demo_{uuid.uuid4().hex[:16]}",
@@ -238,13 +294,13 @@ def _build_demo_transaction() -> dict:
         "department": "engineering",
         "account_code": account_code_map.get(product_line, "4000-revenue"),
         "cost_center": "CC-ENG-001",
-        "basis": random.choice(["cash", "accrual"]),
+        "basis": basis,
         "decline_code": decline_code,
         "risk_level": random.choice(["normal", "normal", "normal", "elevated", "highest"]),
         "dispute_id": None,
         "dispute_status": None,
         "is_recurring": random.random() < 0.3,
-        "description": f"Demo {txn_type} — {product_line}",
+        "description": desc,
         "metadata_json": f'{{"demo": true, "product_line": "{product_line}"}}',
         "ingested_at": now,
         "batch_id": f"demo_{now.strftime('%Y%m%d_%H%M%S')}",
@@ -316,7 +372,14 @@ async def create_manual_transaction(body: ManualTransaction):
         fee_amount = int(amount_cents * 0.029 + 30)
     elif body.type == "refund":
         fee_amount = -int(amount_cents * 0.029)
-    net_amount = amount_cents - fee_amount if body.type == "charge" else amount_cents
+
+    # Net amount: negative for outflows (payout, refund, fee)
+    if body.type in ("refund", "payout", "fee"):
+        net_amount = -amount_cents
+    elif body.type == "charge" and body.status == "succeeded":
+        net_amount = amount_cents - fee_amount
+    else:
+        net_amount = amount_cents
 
     txn_id = f"manual_{uuid.uuid4().hex[:16]}"
     row = {
@@ -600,15 +663,20 @@ async def report_cashflow():
                         from datetime import timedelta
 
                         last_d, cur_c = last_pos[0], float(last_pos[1] or 0.0)
-                        avg_flow = (
-                            conn.execute("""
-                            SELECT AVG(net_flow_usd) FROM (
-                                SELECT net_flow_usd FROM analytics.daily_cash_position
+                        pos_summary = conn.execute("""
+                            SELECT
+                                AVG(inflows_usd),
+                                AVG(outflows_usd),
+                                AVG(net_flow_usd)
+                            FROM (
+                                SELECT inflows_usd, outflows_usd, net_flow_usd
+                                FROM analytics.daily_cash_position
                                 ORDER BY date DESC LIMIT 30
                             )
-                        """).fetchone()[0]
-                            or 0.0
-                        )
+                        """).fetchone()
+                        avg_in = float(pos_summary[0] or 0.0) if pos_summary else 0.0
+                        avg_out = float(pos_summary[1] or 0.0) if pos_summary else 0.0
+                        avg_flow = float(pos_summary[2] or (avg_in - avg_out)) if pos_summary else 0.0
                         daily_flow = float(avg_flow)
                         running_c = cur_c
                         for day_i in range(1, 92):
@@ -621,8 +689,8 @@ async def report_cashflow():
                                     "p10": round(running_c - cone, 2),
                                     "p50": round(running_c, 2),
                                     "p90": round(running_c + cone, 2),
-                                    "inflows": round(max(0.0, daily_flow), 2),
-                                    "outflows": round(max(0.0, -daily_flow), 2),
+                                    "inflows": round(max(0.0, avg_in), 2),
+                                    "outflows": round(max(0.0, avg_out), 2),
                                 }
                             )
             except Exception:

@@ -122,7 +122,6 @@ export default function ForecastFanChart({ forecast }: Props) {
   return (
     <div className="card animate-in stagger-2" style={{ marginBottom: '22px' }}>
       <div className="card-header">
-        <div className="card-icon purple"></div>
         <span className="card-title">
           13-Week ML Cash Flow Forecast (Quantile Regression Fan Chart)
         </span>

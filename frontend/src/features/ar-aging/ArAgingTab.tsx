@@ -53,7 +53,6 @@ export default function ArAgingTab({ refreshKey }: Props) {
     return (
       <div className="card animate-in">
         <div className="card-header">
-          <div className="card-icon green"></div>
           <span className="card-title">Accounts Receivable Aging Report</span>
         </div>
         <div className="card-body">
@@ -75,7 +74,6 @@ export default function ArAgingTab({ refreshKey }: Props) {
 
       <div className="card animate-in" style={{ marginTop: '16px' }}>
         <div className="card-header">
-          <div className="card-icon green"></div>
           <span className="card-title">Accounts Receivable Aging Report</span>
           <span className="card-subtitle">
             Accrual Basis Outstanding Invoices · rows colored by severity

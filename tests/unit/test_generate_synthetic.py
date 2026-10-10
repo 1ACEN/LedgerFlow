@@ -73,6 +73,17 @@ class TestGenerateSynthetic:
         )
         assert transactions["amount"].min() > 0
 
+        # Outflow types should have negative net_amount
+        refunds = transactions.filter(transactions["type"] == "refund")
+        payouts = transactions.filter(transactions["type"] == "payout")
+        fees = transactions.filter(transactions["type"] == "fee")
+        if len(refunds) > 0:
+            assert (refunds["net_amount"] < 0).all()
+        if len(payouts) > 0:
+            assert (payouts["net_amount"] < 0).all()
+        if len(fees) > 0:
+            assert (fees["net_amount"] < 0).all()
+
     def test_write_to_duckdb(self):
         """Integration test: write to DuckDB and read back."""
         customers = generate_customers(10)

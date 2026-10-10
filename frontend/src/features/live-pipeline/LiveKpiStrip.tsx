@@ -36,9 +36,7 @@ export const LiveKpiStrip: React.FC<LiveKpiStripProps> = ({ kpis, loading }) => 
     <div className="grid-4">
       {/* Metric 1: Total Transactions */}
       <div className="metric-card animate-in stagger-1">
-        <div className="metric-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>Total Transactions</span>
-        </div>
+        <div className="metric-label">Total Transactions</div>
         <div className="metric-value" style={{ color: 'var(--accent)' }}>
           {kpis.totalTransactions > 0 ? kpis.totalTransactions.toLocaleString() : '—'}
         </div>
@@ -47,9 +45,7 @@ export const LiveKpiStrip: React.FC<LiveKpiStripProps> = ({ kpis, loading }) => 
 
       {/* Metric 2: Today's Ingested Volume */}
       <div className="metric-card animate-in stagger-2">
-        <div className="metric-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>Today's Ingested Volume</span>
-        </div>
+        <div className="metric-label">Today's Ingested Volume</div>
         <div className="metric-value" style={{ color: 'var(--green)' }}>
           {kpis.todayVolume.toLocaleString()}
         </div>
@@ -60,9 +56,7 @@ export const LiveKpiStrip: React.FC<LiveKpiStripProps> = ({ kpis, loading }) => 
 
       {/* Metric 3: Live Success Rate */}
       <div className="metric-card animate-in stagger-3">
-        <div className="metric-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>Live Success Rate</span>
-        </div>
+        <div className="metric-label">Live Success Rate</div>
         <div className="metric-value" style={{ color: 'var(--yellow)' }}>
           {kpis.liveSuccessRate != null ? `${kpis.liveSuccessRate}%` : '—'}
         </div>
@@ -71,9 +65,7 @@ export const LiveKpiStrip: React.FC<LiveKpiStripProps> = ({ kpis, loading }) => 
 
       {/* Metric 4: Last Ingested Event */}
       <div className="metric-card animate-in stagger-4">
-        <div className="metric-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>Last Ingested Event</span>
-        </div>
+        <div className="metric-label">Last Ingested Event</div>
         <div
           className="metric-value"
           style={{

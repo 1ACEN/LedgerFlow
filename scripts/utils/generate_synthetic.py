@@ -154,13 +154,13 @@ def generate_transactions(
         for oa in occurred_ats
     ]
 
-    # Type distribution: mostly charges, some refunds, fees, payouts
+    # Type distribution: charges, refunds, payouts, fees, transfers
     type_weights = {
-        "charge": 0.65,
-        "refund": 0.08,
-        "payout": 0.05,
+        "charge": 0.60,
+        "refund": 0.07,
+        "payout": 0.10,
         "fee": 0.12,
-        "transfer": 0.03,
+        "transfer": 0.04,
         "invoice_payment": 0.05,
         "adjustment": 0.02,
     }
@@ -202,16 +202,20 @@ def generate_transactions(
             amt_cents = int(np.random.lognormal(mean=9.5, sigma=1.0))
             amt_cents = min(max(amt_cents, 50), 100000)
         elif t == "payout":
-            amt_cents = int(np.random.lognormal(mean=12, sigma=1.5))
-            amt_cents = min(max(amt_cents, 1000), 2000000)
+            # Operating outflows: vendor payouts, cloud hosting, payroll, merchant sweeps
+            amt_cents = int(np.random.lognormal(mean=10.8, sigma=1.2))
+            amt_cents = min(max(amt_cents, 1000), 800000)  # $10 to $8000
         elif t == "fee":
-            amt_cents = int(np.random.uniform(30, 5000))
+            amt_cents = int(np.random.uniform(30, 4000))
+        elif t == "transfer":
+            amt_cents = int(np.random.lognormal(mean=10.5, sigma=1.1))
+            amt_cents = min(max(amt_cents, 1000), 500000)
         else:
             amt_cents = int(np.random.lognormal(mean=10, sigma=1.0))
             amt_cents = min(max(amt_cents, 100), 100000)
         amounts.append(amt_cents)
 
-    # Net amount = amount - fee (for charges)
+    # Net amount: positive for inflows, negative for outflows (payouts, refunds, fees)
     net_amounts = []
     fee_amounts = []
     for i in range(n_rows):
@@ -221,12 +225,30 @@ def generate_transactions(
             # Fee: 2.9% + 30c for Stripe-like
             fee = int(amt * 0.029 + 30)
             fee = min(fee, amt)  # Can't exceed amount
+            fee_amounts.append(fee)
+            net_amounts.append(amt - fee)
+        elif t == "refund":
+            fee_amounts.append(0)
+            net_amounts.append(-amt)  # Cash outflow back to customer
+        elif t == "payout":
+            fee = int(np.random.choice([0, 25, 100, 250]))  # Wire/ACH disbursement fee
+            fee_amounts.append(fee)
+            net_amounts.append(-amt)  # Cash outflow
         elif t == "fee":
-            fee = 0
+            fee_amounts.append(amt)
+            net_amounts.append(-amt)  # Processing fee cash outflow
+        elif t == "transfer":
+            fee_amounts.append(0)
+            # 60% of transfers are outgoing sweeps / tax reserves (outflows)
+            is_outflow = random.random() < 0.6
+            net_amounts.append(-amt if is_outflow else amt)
+        elif t == "adjustment":
+            fee_amounts.append(0)
+            is_debit = random.random() < 0.5
+            net_amounts.append(-amt if is_debit else amt)
         else:
-            fee = 0
-        fee_amounts.append(fee)
-        net_amounts.append(amt - fee if t == "charge" else amt)
+            fee_amounts.append(0)
+            net_amounts.append(amt)
 
     # Entities
     customer_ids = np.random.choice(customers["customer_id"].to_list(), n_rows)
@@ -238,8 +260,14 @@ def generate_transactions(
     account_codes = [ACCOUNT_CODES.get(pl, "9999-unknown") for pl in product_lines]
     cost_centers = [f"CC-{fake.bothify('??-###')}" for _ in range(n_rows)]
 
-    # Basis
-    basis = np.random.choice(BASIS_TYPES, n_rows, p=[0.7, 0.3])
+    # Basis: payouts and fees are primarily cash movements
+    basis = []
+    for i in range(n_rows):
+        t = types[i]
+        if t in ("payout", "fee"):
+            basis.append("cash" if random.random() < 0.85 else "accrual")
+        else:
+            basis.append("cash" if random.random() < 0.70 else "accrual")
 
     # Risk & decline
     decline_codes = []
@@ -270,9 +298,21 @@ def generate_transactions(
         elif t == "refund":
             descriptions.append(f"Refund for {product_lines[i].replace('_', ' ')}")
         elif t == "payout":
-            descriptions.append(f"Payout to bank account ending in {fake.bothify('####')}")
+            descriptions.append(
+                random.choice([
+                    f"Vendor Payout - {fake.company()}",
+                    "Cloud Infrastructure - AWS / GCP",
+                    f"Merchant Settlement - {fake.bothify('acct_###')}",
+                    f"Contractor Disbursement - {fake.name()}",
+                    f"Payout to bank account ending in {fake.bothify('####')}",
+                    "SaaS Software Subscription & Tooling",
+                    "Office Facilities & Operating Expense",
+                ])
+            )
         elif t == "fee":
             descriptions.append(f"Payment processing fee - {product_lines[i]}")
+        elif t == "transfer":
+            descriptions.append(f"Treasury bank sweep - {fake.bothify('acct_###')}")
         else:
             descriptions.append(fake.sentence())
 

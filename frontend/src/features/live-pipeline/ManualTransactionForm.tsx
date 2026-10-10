@@ -52,7 +52,6 @@ export const ManualTransactionForm: React.FC<ManualTransactionFormProps> = ({
   return (
     <div className="card animate-in stagger-2">
       <div className="card-header">
-        <div className="card-icon blue"></div>
         <div>
           <span className="card-title">Live Manual Transaction Input</span>
           <span className="card-subtitle" style={{ display: 'block' }}>

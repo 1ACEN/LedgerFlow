@@ -36,9 +36,7 @@ export const ExecutiveKpiStrip: React.FC<ExecutiveKpiStripProps> = ({ kpis, load
       <div className="grid-4">
         {/* Metric 1: Current Cash Balance */}
         <div className="metric-card animate-in stagger-1">
-          <div className="metric-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>Current Cash Balance</span>
-          </div>
+          <div className="metric-label">Current Cash Balance</div>
           <div className="metric-value" style={{ color: 'var(--green)' }}>
             {fmtUsd(kpis.currentCash)}
           </div>
@@ -74,9 +72,7 @@ export const ExecutiveKpiStrip: React.FC<ExecutiveKpiStripProps> = ({ kpis, load
 
         {/* Metric 3: Daily Outflow */}
         <div className="metric-card animate-in stagger-3">
-          <div className="metric-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>Daily Outflow (30d avg)</span>
-          </div>
+          <div className="metric-label">Daily Outflow (30d avg)</div>
           <div className="metric-value" style={{ color: 'var(--yellow)' }}>
             {fmtUsd(kpis.dailyOutflow)}
           </div>
@@ -87,9 +83,7 @@ export const ExecutiveKpiStrip: React.FC<ExecutiveKpiStripProps> = ({ kpis, load
 
         {/* Metric 4: Gateway Success Rate */}
         <div className="metric-card animate-in stagger-4">
-          <div className="metric-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>Gateway Success Rate</span>
-          </div>
+          <div className="metric-label">Gateway Success Rate</div>
           <div className="metric-value" style={{ color: 'var(--purple)' }}>
             {kpis.gatewaySuccessRate > 0 ? `${kpis.gatewaySuccessRate}%` : '—'}
           </div>

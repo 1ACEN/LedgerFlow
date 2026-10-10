@@ -33,9 +33,7 @@ export const OpsKpiStrip: React.FC<OpsKpiStripProps> = ({ kpis, loading }) => {
     <div className="grid-4">
       {/* Metric 1: Total Declines */}
       <div className="metric-card animate-in stagger-1">
-        <div className="metric-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>Total Declines Logged</span>
-        </div>
+        <div className="metric-label">Total Declines Logged</div>
         <div className="metric-value" style={{ color: 'var(--red)' }}>
           {kpis.totalDeclines.toLocaleString()}
         </div>
@@ -49,9 +47,7 @@ export const OpsKpiStrip: React.FC<OpsKpiStripProps> = ({ kpis, loading }) => {
 
       {/* Metric 2: Gateway Success Rate */}
       <div className="metric-card animate-in stagger-2">
-        <div className="metric-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>Avg Gateway Success Rate</span>
-        </div>
+        <div className="metric-label">Avg Gateway Success Rate</div>
         <div className="metric-value" style={{ color: 'var(--green)' }}>
           {kpis.avgSuccessRate > 0 ? `${kpis.avgSuccessRate}%` : '—'}
         </div>
@@ -62,9 +58,7 @@ export const OpsKpiStrip: React.FC<OpsKpiStripProps> = ({ kpis, loading }) => {
 
       {/* Metric 3: AI Expected Recovery */}
       <div className="metric-card animate-in stagger-3">
-        <div className="metric-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>AI Predicted Recovery</span>
-        </div>
+        <div className="metric-label">AI Predicted Recovery</div>
         <div className="metric-value" style={{ color: 'var(--purple)' }}>
           {fmtUsd(kpis.potentialRecoveryUsd)}
         </div>
@@ -75,9 +69,7 @@ export const OpsKpiStrip: React.FC<OpsKpiStripProps> = ({ kpis, loading }) => {
 
       {/* Metric 4: Disputes & Chargebacks */}
       <div className="metric-card animate-in stagger-4">
-        <div className="metric-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>Disputes Exposure</span>
-        </div>
+        <div className="metric-label">Disputes Exposure</div>
         <div className="metric-value" style={{ color: 'var(--yellow)' }}>
           {fmtUsd(kpis.totalDisputeAmount)}
         </div>

@@ -53,7 +53,6 @@ export default function CashflowTab({ refreshKey }: Props) {
     return (
       <div className="card animate-in">
         <div className="card-header">
-          <div className="card-icon purple"></div>
           <span className="card-title">Cash Flow &amp; Predictive Forecasting</span>
         </div>
         <div className="card-body">

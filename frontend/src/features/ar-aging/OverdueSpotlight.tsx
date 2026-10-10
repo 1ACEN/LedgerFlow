@@ -13,7 +13,6 @@ export default function OverdueSpotlight({ aging }: Props) {
   return (
     <div className="card animate-in stagger-1">
       <div className="card-header">
-        <div className="card-icon red"></div>
         <span className="card-title">Top Overdue Customers</span>
         <span className="card-subtitle">highest 90+ day balances</span>
       </div>

@@ -54,7 +54,6 @@ export default function RevenueTab({ refreshKey }: Props) {
     return (
       <div className="card animate-in">
         <div className="card-header">
-          <div className="card-icon blue"></div>
           <span className="card-title">CFO &amp; Revenue Analytics</span>
         </div>
         <div className="card-body">

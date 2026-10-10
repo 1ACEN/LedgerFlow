@@ -44,26 +44,23 @@ export const TransactionStreamCard: React.FC<TransactionStreamCardProps> = ({
         className="card-header"
         style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div className="card-icon purple"></div>
-          <div>
-            <span className="card-title">Real-Time Transaction Stream</span>
-            <span className="card-subtitle" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              {pollingEnabled && (
-                <span
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: '50%',
-                    background: 'var(--green)',
-                    boxShadow: '0 0 6px var(--green-glow)',
-                    display: 'inline-block',
-                  }}
-                />
-              )}
-              {transactions.length} recent events · streaming from DuckDB
-            </span>
-          </div>
+        <div>
+          <span className="card-title">Real-Time Transaction Stream</span>
+          <span className="card-subtitle" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {pollingEnabled && (
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: 'var(--green)',
+                  boxShadow: '0 0 6px var(--green-glow)',
+                  display: 'inline-block',
+                }}
+              />
+            )}
+            {transactions.length} recent events · streaming from DuckDB
+          </span>
         </div>
 
         {/* Stream Toggle Control */}
@@ -98,7 +95,7 @@ export const TransactionStreamCard: React.FC<TransactionStreamCardProps> = ({
           <div className="feed-list" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {transactions.map((t) => {
               const isPos = ['charge', 'invoice_payment'].includes(t.type) && t.status === 'succeeded';
-              const isNeg = ['refund', 'fee'].includes(t.type);
+              const isNeg = ['refund', 'fee', 'payout'].includes(t.type) || (t.net_amount_usd != null && t.net_amount_usd < 0);
               const sign = isNeg ? '-' : isPos ? '+' : '';
               const amtColor = isPos ? 'var(--green)' : isNeg ? 'var(--red)' : 'var(--text-primary)';
 
@@ -202,7 +199,7 @@ export const TransactionStreamCard: React.FC<TransactionStreamCardProps> = ({
                         fontFamily: "'JetBrains Mono', monospace",
                       }}
                     >
-                      {sign}{fmtUsd(t.amount_usd)}
+                      {sign}{fmtUsd(Math.abs(t.amount_usd))}
                     </div>
                     <div
                       className={`feed-status ${t.status}`}

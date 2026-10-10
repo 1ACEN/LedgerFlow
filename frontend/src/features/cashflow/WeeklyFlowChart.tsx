@@ -79,7 +79,6 @@ export default function WeeklyFlowChart({ weekly }: Props) {
   return (
     <div className="card animate-in stagger-3">
       <div className="card-header">
-        <div className="card-icon blue"></div>
         <span className="card-title">Weekly Net Cash Flow Trends</span>
         <span className="card-subtitle">operating net cash per week</span>
       </div>

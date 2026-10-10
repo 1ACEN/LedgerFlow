@@ -36,7 +36,6 @@ export const DisputesTable: React.FC<DisputesTableProps> = ({ disputes }) => {
   return (
     <div className="card animate-in stagger-4">
       <div className="card-header">
-        <div className="card-icon yellow"></div>
         <div>
           <span className="card-title">Chargebacks & Disputes Queue</span>
           <span className="card-subtitle" style={{ display: 'block' }}>

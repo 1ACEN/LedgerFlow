@@ -14,7 +14,6 @@ export const SourceDistributionCard: React.FC<SourceDistributionCardProps> = ({ 
   return (
     <div className="card animate-in stagger-3">
       <div className="card-header">
-        <div className="card-icon green"></div>
         <div>
           <span className="card-title">Ledger Source Distribution</span>
           <span className="card-subtitle" style={{ display: 'block' }}>
