@@ -13,6 +13,7 @@ Usage:
     uv run python scripts/api/webhooks.py --port 8080
 """
 
+import contextlib
 import hashlib
 import hmac
 import json
@@ -153,7 +154,7 @@ async def startup_event():
                       AND basis != 'cash';
                 """)
                 # Also ensure forecast table has realistic p50_outflows_usd
-                try:
+                with contextlib.suppress(Exception):
                     conn.execute("""
                         UPDATE ml.cash_flow_forecast
                         SET p50_outflows_usd = (
@@ -163,8 +164,6 @@ async def startup_event():
                         )
                         WHERE p50_outflows_usd = 0 OR p50_outflows_usd IS NULL;
                     """)
-                except Exception:
-                    pass
     except Exception as e:
         console.log(f"[red]Startup DB check failed: {e}[/red]")
 
@@ -252,13 +251,15 @@ def _build_demo_transaction() -> dict:
 
     # Realistic descriptions for outflows vs charges
     if txn_type == "payout":
-        desc = random.choice([
-            "Cloud Infrastructure — AWS us-east-1",
-            "Vendor Disbursement — Datadog",
-            "Contractor Services — Dev & Ops",
-            "Merchant Payout — Bank Account *4821",
-            "SaaS Licensing — GitHub / Slack",
-        ])
+        desc = random.choice(
+            [
+                "Cloud Infrastructure — AWS us-east-1",
+                "Vendor Disbursement — Datadog",
+                "Contractor Services — Dev & Ops",
+                "Merchant Payout — Bank Account *4821",
+                "SaaS Licensing — GitHub / Slack",
+            ]
+        )
     elif txn_type == "refund":
         desc = f"Refund — {product_line.replace('_', ' ').title()}"
     elif txn_type == "fee":
@@ -650,20 +651,19 @@ async def report_cashflow():
 
         # If no ML forecast has been run yet, generate baseline projection from daily cash position
         if not forecast_list:
-            try:
-                with _db_lock:
-                    conn = get_conn(DUCKDB_PATH)
-                    last_pos = conn.execute("""
+            with contextlib.suppress(Exception), _db_lock:
+                conn = get_conn(DUCKDB_PATH)
+                last_pos = conn.execute("""
                         SELECT date, cumulative_cash_usd
                         FROM analytics.daily_cash_position
                         ORDER BY date DESC
                         LIMIT 1
                     """).fetchone()
-                    if last_pos and last_pos[0]:
-                        from datetime import timedelta
+                if last_pos and last_pos[0]:
+                    from datetime import timedelta
 
-                        last_d, cur_c = last_pos[0], float(last_pos[1] or 0.0)
-                        pos_summary = conn.execute("""
+                    last_d, cur_c = last_pos[0], float(last_pos[1] or 0.0)
+                    pos_summary = conn.execute("""
                             SELECT
                                 AVG(inflows_usd),
                                 AVG(outflows_usd),
@@ -674,27 +674,25 @@ async def report_cashflow():
                                 ORDER BY date DESC LIMIT 30
                             )
                         """).fetchone()
-                        avg_in = float(pos_summary[0] or 0.0) if pos_summary else 0.0
-                        avg_out = float(pos_summary[1] or 0.0) if pos_summary else 0.0
-                        avg_flow = float(pos_summary[2] or (avg_in - avg_out)) if pos_summary else 0.0
-                        daily_flow = float(avg_flow)
-                        running_c = cur_c
-                        for day_i in range(1, 92):
-                            pred_d = last_d + timedelta(days=day_i)
-                            running_c += daily_flow
-                            cone = abs(running_c) * 0.015 * (day_i / 14.0)
-                            forecast_list.append(
-                                {
-                                    "date": str(pred_d),
-                                    "p10": round(running_c - cone, 2),
-                                    "p50": round(running_c, 2),
-                                    "p90": round(running_c + cone, 2),
-                                    "inflows": round(max(0.0, avg_in), 2),
-                                    "outflows": round(max(0.0, avg_out), 2),
-                                }
-                            )
-            except Exception:
-                pass
+                    avg_in = float(pos_summary[0] or 0.0) if pos_summary else 0.0
+                    avg_out = float(pos_summary[1] or 0.0) if pos_summary else 0.0
+                    avg_flow = float(pos_summary[2] or (avg_in - avg_out)) if pos_summary else 0.0
+                    daily_flow = float(avg_flow)
+                    running_c = cur_c
+                    for day_i in range(1, 92):
+                        pred_d = last_d + timedelta(days=day_i)
+                        running_c += daily_flow
+                        cone = abs(running_c) * 0.015 * (day_i / 14.0)
+                        forecast_list.append(
+                            {
+                                "date": str(pred_d),
+                                "p10": round(running_c - cone, 2),
+                                "p50": round(running_c, 2),
+                                "p90": round(running_c + cone, 2),
+                                "inflows": round(max(0.0, avg_in), 2),
+                                "outflows": round(max(0.0, avg_out), 2),
+                            }
+                        )
 
         return {
             "forecast": forecast_list,

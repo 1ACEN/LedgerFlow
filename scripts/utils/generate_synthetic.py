@@ -299,15 +299,17 @@ def generate_transactions(
             descriptions.append(f"Refund for {product_lines[i].replace('_', ' ')}")
         elif t == "payout":
             descriptions.append(
-                random.choice([
-                    f"Vendor Payout - {fake.company()}",
-                    "Cloud Infrastructure - AWS / GCP",
-                    f"Merchant Settlement - {fake.bothify('acct_###')}",
-                    f"Contractor Disbursement - {fake.name()}",
-                    f"Payout to bank account ending in {fake.bothify('####')}",
-                    "SaaS Software Subscription & Tooling",
-                    "Office Facilities & Operating Expense",
-                ])
+                random.choice(
+                    [
+                        f"Vendor Payout - {fake.company()}",
+                        "Cloud Infrastructure - AWS / GCP",
+                        f"Merchant Settlement - {fake.bothify('acct_###')}",
+                        f"Contractor Disbursement - {fake.name()}",
+                        f"Payout to bank account ending in {fake.bothify('####')}",
+                        "SaaS Software Subscription & Tooling",
+                        "Office Facilities & Operating Expense",
+                    ]
+                )
             )
         elif t == "fee":
             descriptions.append(f"Payment processing fee - {product_lines[i]}")
