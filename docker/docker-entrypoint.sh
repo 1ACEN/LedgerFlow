@@ -15,7 +15,7 @@ if [ -d "/app/models" ] && [ ! -f "${MODEL_REGISTRY_PATH:-/models/}/cash_forecas
     cp -r /app/models/* "${MODEL_REGISTRY_PATH:-/models/}/" 2>/dev/null || true
 fi
 
-# Initialize database schema if not exists
+# Initialize database schema if not exists, or run migrations if existing
 if [ ! -f "$DUCKDB_PATH" ]; then
     echo "Initializing DuckDB schema..."
     python scripts/db/init_db.py --db "$DUCKDB_PATH" || true
@@ -25,6 +25,9 @@ if [ ! -f "$DUCKDB_PATH" ]; then
         echo "Generating seed transactions..."
         python scripts/utils/generate_synthetic.py --rows 2000 --output "$DUCKDB_PATH" || true
     fi
+else
+    echo "Running database migrations..."
+    python scripts/db/migrate.py --db "$DUCKDB_PATH" || true
 fi
 
 # Generate forecast predictions if models exist (non-blocking)

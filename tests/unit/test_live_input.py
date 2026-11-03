@@ -66,6 +66,26 @@ class TestLiveInput:
         assert normalized["source"] == "stripe"
         assert normalized["merchant_account_id"] == "acct_test"
 
+        # Verify signed accounting for refunds
+        refund_event = {
+            "id": "evt_ref_123",
+            "type": "charge.refunded",
+            "created": 1787673600,
+            "data": {
+                "object": {
+                    "id": "ch_ref_123",
+                    "amount": 5000,
+                    "currency": "usd",
+                    "status": "succeeded",
+                    "customer": "cus_test456",
+                }
+            },
+        }
+        ref_norm = normalize_stripe_event(refund_event, "acct_test")
+        assert ref_norm is not None
+        assert ref_norm["type"] == "refund"
+        assert ref_norm["net_amount"] == -5000
+
     def test_normalize_plaid_transaction(self):
         """Test Plaid bank feed transaction normalization."""
         txn = {
@@ -84,8 +104,23 @@ class TestLiveInput:
         assert normalized["type"] == "charge"
         assert normalized["status"] == "succeeded"
         assert normalized["amount"] == 4550  # cents
+        assert normalized["net_amount"] == -4550  # debit outflow is negative
         assert normalized["source"] == "plaid"
         assert normalized["product_line"] == "engineering"
+
+        # Test Plaid credit (inflow deposit)
+        credit_txn = {
+            "transaction_id": "plaid_tx_credit",
+            "date": "2026-08-25",
+            "amount": -1200.00,  # Plaid negative = credit/inflow
+            "iso_currency_code": "USD",
+            "category": ["INCOME_WAGES"],
+            "name": "Customer Direct Deposit",
+            "pending": False,
+        }
+        cred_norm = normalize_plaid_transaction(credit_txn, "bank_acct_01")
+        assert cred_norm is not None
+        assert cred_norm["net_amount"] == 120000  # positive inflow in cents
 
     def test_upsert_transactions_deduplication(self):
         """Test that upserting duplicate transactions updates rather than duplicates."""
@@ -310,3 +345,117 @@ class TestAPIEndpoints:
         """Verify static assets route is mounted."""
         mount_paths = [route.path for route in app.routes if hasattr(route, "path")]
         assert "/assets" in mount_paths
+
+    def test_stripe_webhook_authenticated_success(self, client, monkeypatch):
+        """Verify authenticated Stripe webhook event is accepted."""
+        import json
+        import time
+
+        import stripe
+
+        secret = "whsec_test_secret_stripe_999"
+        monkeypatch.setattr("scripts.api.webhooks.STRIPE_WEBHOOK_SECRET", secret)
+
+        event_payload = {
+            "id": "evt_auth_test_123",
+            "type": "charge.succeeded",
+            "created": int(time.time()),
+            "data": {
+                "object": {
+                    "id": "ch_auth_test_123",
+                    "amount": 25000,
+                    "currency": "usd",
+                    "status": "succeeded",
+                    "customer": "cus_auth_test",
+                    "description": "Authenticated Webhook Test",
+                    "metadata": {"product_line": "subscriptions"},
+                }
+            },
+        }
+        payload_bytes = json.dumps(event_payload).encode("utf-8")
+        timestamp = int(time.time())
+        signed_payload = f"{timestamp}.{payload_bytes.decode('utf-8')}"
+        sig = stripe.WebhookSignature._compute_signature(signed_payload, secret)
+        sig_header = f"t={timestamp},v1={sig}"
+
+        response = client.post(
+            "/webhooks/stripe",
+            content=payload_bytes,
+            headers={"stripe-signature": sig_header, "content-type": "application/json"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "accepted"
+        assert data["event_id"] == "evt_auth_test_123"
+
+    def test_stripe_webhook_invalid_signature_rejected(self, client, monkeypatch):
+        """Verify Stripe webhook with invalid signature is rejected with 400."""
+        monkeypatch.setattr("scripts.api.webhooks.STRIPE_WEBHOOK_SECRET", "whsec_test_secret")
+
+        response = client.post(
+            "/webhooks/stripe",
+            json={"id": "evt_fake", "type": "charge.succeeded"},
+            headers={"stripe-signature": "t=12345,v1=bad_signature"},
+        )
+        assert response.status_code == 400
+
+    def test_stripe_webhook_missing_signature_rejected(self, client, monkeypatch):
+        """Verify Stripe webhook without signature is rejected when secret is set."""
+        monkeypatch.setattr("scripts.api.webhooks.STRIPE_WEBHOOK_SECRET", "whsec_test_secret")
+
+        response = client.post(
+            "/webhooks/stripe",
+            json={"id": "evt_fake", "type": "charge.succeeded"},
+        )
+        assert response.status_code == 400
+        assert "Missing stripe-signature header" in response.json()["detail"]
+
+    def test_plaid_webhook_authenticated_success(self, client, monkeypatch):
+        """Verify authenticated Plaid webhook is accepted with valid HMAC."""
+        import hashlib
+        import hmac
+        import json
+
+        secret = "plaid_secret_test_xyz"
+        monkeypatch.setattr("scripts.api.webhooks.PLAID_WEBHOOK_SECRET", secret)
+
+        body = {
+            "webhook_type": "TRANSACTIONS",
+            "webhook_code": "SYNC_UPDATES_AVAILABLE",
+            "item_id": "item_auth_test_456",
+            "new_transactions": 5,
+        }
+        payload_bytes = json.dumps(body).encode("utf-8")
+        sig = hmac.new(secret.encode(), payload_bytes, hashlib.sha256).hexdigest()
+
+        response = client.post(
+            "/webhooks/plaid",
+            content=payload_bytes,
+            headers={"Plaid-Verification": sig, "content-type": "application/json"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "accepted"
+        assert data["action"] == "queued_sync"
+
+    def test_plaid_webhook_invalid_signature_rejected(self, client, monkeypatch):
+        """Verify Plaid webhook with invalid HMAC signature is rejected with 400."""
+        monkeypatch.setattr("scripts.api.webhooks.PLAID_WEBHOOK_SECRET", "plaid_secret_test")
+
+        response = client.post(
+            "/webhooks/plaid",
+            json={"webhook_type": "TRANSACTIONS", "webhook_code": "SYNC_UPDATES_AVAILABLE"},
+            headers={"Plaid-Verification": "invalid_hex_digest"},
+        )
+        assert response.status_code == 400
+
+    def test_plaid_webhook_missing_signature_rejected(self, client, monkeypatch):
+        """Verify Plaid webhook without signature header is rejected when secret is set."""
+        monkeypatch.setattr("scripts.api.webhooks.PLAID_WEBHOOK_SECRET", "plaid_secret_test")
+
+        response = client.post(
+            "/webhooks/plaid",
+            json={"webhook_type": "TRANSACTIONS", "webhook_code": "SYNC_UPDATES_AVAILABLE"},
+        )
+        assert response.status_code == 400
+        assert "Missing Plaid-Verification header" in response.json()["detail"]

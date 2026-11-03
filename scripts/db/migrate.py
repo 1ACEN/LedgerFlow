@@ -164,9 +164,9 @@ MIGRATIONS = [
         SELECT
             DATE_TRUNC('month', occurred_at)::DATE AS month,
             account_code,
-            SUM(CASE WHEN amount_usd > 0 THEN amount_usd ELSE 0 END) AS credit_usd,
-            SUM(CASE WHEN amount_usd < 0 THEN -amount_usd ELSE 0 END) AS debit_usd,
-            SUM(amount_usd) AS net_usd
+            SUM(CASE WHEN net_amount_usd > 0 THEN net_amount_usd ELSE 0 END) AS credit_usd,
+            SUM(CASE WHEN net_amount_usd < 0 THEN -net_amount_usd ELSE 0 END) AS debit_usd,
+            SUM(net_amount_usd) AS net_usd
         FROM transactions
         WHERE basis = 'accrual' AND status = 'succeeded'
         GROUP BY DATE_TRUNC('month', occurred_at), account_code
@@ -279,6 +279,23 @@ MIGRATIONS = [
         CREATE INDEX IF NOT EXISTS idx_transactions_idempotency ON transactions(idempotency_key);
     """,
     ),
+    (
+        "005",
+        "Align signed accounting in monthly_pl view",
+        """
+        CREATE OR REPLACE VIEW analytics.monthly_pl AS
+        SELECT
+            DATE_TRUNC('month', occurred_at)::DATE AS month,
+            account_code,
+            SUM(CASE WHEN net_amount_usd > 0 THEN net_amount_usd ELSE 0 END) AS credit_usd,
+            SUM(CASE WHEN net_amount_usd < 0 THEN -net_amount_usd ELSE 0 END) AS debit_usd,
+            SUM(net_amount_usd) AS net_usd
+        FROM transactions
+        WHERE basis = 'accrual' AND status = 'succeeded'
+        GROUP BY DATE_TRUNC('month', occurred_at), account_code
+        ORDER BY month, account_code;
+    """,
+    ),
 ]
 
 
@@ -318,6 +335,18 @@ def apply_migration(conn: duckdb.DuckDBPyConnection, version: str, description: 
     """,
         [version, description, str(hash(sql))],
     )
+
+
+def run_migrations(conn: duckdb.DuckDBPyConnection) -> list[str]:
+    """Apply all pending migrations to the database connection."""
+    ensure_migration_table(conn)
+    applied = get_applied_migrations(conn)
+    newly_applied = []
+    for version, description, sql in MIGRATIONS:
+        if version not in applied:
+            apply_migration(conn, version, description, sql)
+            newly_applied.append(version)
+    return newly_applied
 
 
 def main():

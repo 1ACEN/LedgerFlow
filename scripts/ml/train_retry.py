@@ -10,7 +10,7 @@ Usage:
 """
 
 import argparse
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import duckdb
@@ -47,6 +47,10 @@ DECLINE_CODE_ORDER = [
 CARD_BRAND_ORDER = ["Visa", "Mastercard", "American Express", "Discover", "JCB"]
 CARD_FUNDING_ORDER = ["credit", "debit", "prepaid"]
 RECOMMENDED_ACTIONS = ["retry_1h", "retry_24h", "retry_72h", "do_not_retry"]
+
+DECLINE_CODE_MAP = {code: i for i, code in enumerate(DECLINE_CODE_ORDER)}
+CARD_BRAND_MAP = {brand: i for i, brand in enumerate(CARD_BRAND_ORDER)}
+CARD_FUNDING_MAP = {funding: i for i, funding in enumerate(CARD_FUNDING_ORDER)}
 
 
 def prepare_features(conn: duckdb.DuckDBPyConnection) -> tuple:
@@ -121,11 +125,20 @@ def prepare_features(conn: duckdb.DuckDBPyConnection) -> tuple:
     # Feature engineering
     df = df.with_columns(
         [
-            # Decline code encoding (ordinal based on retry success rates)
-            pl.col("decline_code").cast(pl.Categorical).to_physical().alias("decline_code_enc"),
+            # Decline code encoding (deterministic ordinal mapping aligned with inference)
+            pl.col("decline_code")
+            .replace_strict(DECLINE_CODE_MAP, default=len(DECLINE_CODE_ORDER))
+            .cast(pl.Int32)
+            .alias("decline_code_enc"),
             # Card features
-            pl.col("card_brand").cast(pl.Categorical).to_physical().alias("card_brand_enc"),
-            pl.col("card_funding").cast(pl.Categorical).to_physical().alias("card_funding_enc"),
+            pl.col("card_brand")
+            .replace_strict(CARD_BRAND_MAP, default=len(CARD_BRAND_ORDER))
+            .cast(pl.Int32)
+            .alias("card_brand_enc"),
+            pl.col("card_funding")
+            .replace_strict(CARD_FUNDING_MAP, default=len(CARD_FUNDING_ORDER))
+            .cast(pl.Int32)
+            .alias("card_funding_enc"),
             # Amount features
             pl.col("amount_usd").log1p().alias("log_amount_usd"),
             (pl.col("amount_usd") > pl.col("amount_usd").quantile(0.9))
@@ -148,32 +161,6 @@ def prepare_features(conn: duckdb.DuckDBPyConnection) -> tuple:
         ]
     )
 
-    # Build customer retry history JSON (for inference time)
-    retry_history = (
-        df.group_by("customer_id")
-        .agg(
-            [
-                pl.col("target").sum().alias("total_retries_succeeded"),
-                pl.col("target").count().alias("total_retries_attempted"),
-            ]
-        )
-        .with_columns(
-            [
-                (pl.col("total_retries_succeeded") / pl.col("total_retries_attempted")).alias(
-                    "customer_retry_success_rate"
-                )
-            ]
-        )
-    )
-
-    # Merge retry history
-    df = df.join(
-        retry_history.select(["customer_id", "customer_retry_success_rate"]),
-        on="customer_id",
-        how="left",
-    )
-    df = df.with_columns(pl.col("customer_retry_success_rate").fill_null(0))
-
     # Target: succeeded on retry within 7 days
     y = df["target"].to_numpy()
 
@@ -192,7 +179,6 @@ def prepare_features(conn: duckdb.DuckDBPyConnection) -> tuple:
         "cust_log_avg_decline_amt",
         "cust_success_rate_30d",
         "cust_high_decline_velocity",
-        "customer_retry_success_rate",
     ]
 
     X = df.select(feature_cols).to_numpy()
@@ -313,87 +299,171 @@ def main():
         "card_brand_mapping": {brand: i for i, brand in enumerate(CARD_BRAND_ORDER)},
         "card_funding_mapping": {funding: i for i, funding in enumerate(CARD_FUNDING_ORDER)},
         "metrics": metrics,
-        "trained_at": datetime.utcnow().isoformat(),
-        "version": f"v{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}",
+        "trained_at": datetime.now(UTC).isoformat(),
+        "version": f"v{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}",
         "thresholds": {"high": 0.7, "medium": 0.4, "low": 0.2},
     }
 
     dump(model_bundle, args.output)
     console.log(f"\n[green][OK][/green] Model saved to {args.output}")
 
-    # Write decline predictions to ml.decline_predictions
+    # Write decline predictions to ml.decline_predictions using aligned inference
     try:
-        import xgboost as xgb
-
-        dval = xgb.DMatrix(val_df.select(feature_cols).to_pandas())
-        probs = model.predict(dval)
-
-        pred_rows = []
-        now_ts = datetime.utcnow()
-        for idx, row in enumerate(val_df.iter_rows(named=True)):
-            prob = float(probs[idx])
-            if prob >= 0.7:
-                action = "retry_1h"
-                retry_at = now_ts + timedelta(hours=1)
-            elif prob >= 0.4:
-                action = "retry_24h"
-                retry_at = now_ts + timedelta(hours=24)
-            elif prob >= 0.2:
-                action = "retry_72h"
-                retry_at = now_ts + timedelta(hours=72)
-            else:
-                action = "do_not_retry"
-                retry_at = None
-
-            pred_rows.append(
-                {
-                    "transaction_id": row["transaction_id"],
-                    "decline_code": row.get("decline_code"),
-                    "card_brand": row.get("card_brand"),
-                    "card_funding": row.get("card_funding"),
-                    "amount_usd": float(row.get("amount_usd") or 0.0),
-                    "occurred_hour": int(row.get("occurred_hour") or 0),
-                    "customer_id": row.get("customer_id"),
-                    "customer_retry_history": "{}",
-                    "retry_success_probability": round(prob, 4),
-                    "recommended_action": action,
-                    "recommended_retry_at": retry_at,
-                    "expected_recovery_usd": round(prob * float(row.get("amount_usd") or 0.0), 2),
-                    "model_version": model_bundle["version"],
-                    "scored_at": now_ts,
-                }
-            )
-
-        pred_df = pl.DataFrame(pred_rows)
-        conn.register("pred_staging", pred_df)
-        conn.execute("CREATE SCHEMA IF NOT EXISTS ml;")
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS ml.decline_predictions (
-                transaction_id              VARCHAR PRIMARY KEY,
-                decline_code                VARCHAR,
-                card_brand                  VARCHAR,
-                card_funding                VARCHAR,
-                amount_usd                  DOUBLE,
-                occurred_hour               SMALLINT,
-                customer_id                 VARCHAR,
-                customer_retry_history      JSON,
-                retry_success_probability   DOUBLE,
-                recommended_action          VARCHAR,
-                recommended_retry_at        TIMESTAMP WITH TIME ZONE,
-                expected_recovery_usd       DOUBLE,
-                model_version               VARCHAR,
-                scored_at                   TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-            );
-        """)
-        conn.execute("INSERT OR REPLACE INTO ml.decline_predictions SELECT * FROM pred_staging")
+        count = score_and_record_predictions(conn, model_bundle, limit=100)
         console.log(
-            f"[green][OK][/green] Scored and wrote {len(pred_rows)} predictions to ml.decline_predictions"
+            f"[green][OK][/green] Scored and wrote {count} predictions to ml.decline_predictions"
         )
     except Exception as e:
         console.log(f"[yellow]Warning: Could not write decline predictions: {e}[/yellow]")
 
     conn.close()
     console.rule("[bold green]Training complete![/bold green]")
+
+
+def score_and_record_predictions(
+    conn: duckdb.DuckDBPyConnection,
+    model_bundle: dict,
+    limit: int = 100,
+) -> int:
+    """Score recent unrecovered declines and record into ml.decline_predictions."""
+    model = model_bundle["model"]
+    feature_cols = model_bundle["feature_columns"]
+    decline_code_map = model_bundle.get("decline_code_mapping", DECLINE_CODE_MAP)
+    card_brand_map = model_bundle.get("card_brand_mapping", CARD_BRAND_MAP)
+    card_funding_map = model_bundle.get("card_funding_mapping", CARD_FUNDING_MAP)
+
+    query = f"""
+        WITH declined AS (
+            SELECT
+                t.transaction_id,
+                t.decline_code,
+                COALESCE(json_extract_string(t.metadata_json, '$.card_brand'), 'Visa') AS card_brand,
+                COALESCE(json_extract_string(t.metadata_json, '$.card_funding'), 'credit') AS card_funding,
+                t.amount_usd,
+                EXTRACT(HOUR FROM t.occurred_at)::INT AS occurred_hour,
+                t.customer_id,
+                t.occurred_at
+            FROM transactions t
+            WHERE t.status = 'failed'
+              AND t.decline_code IS NOT NULL
+              AND t.type IN ('charge', 'invoice_payment')
+            ORDER BY t.occurred_at DESC
+            LIMIT {limit}
+        ),
+        customer_history AS (
+            SELECT
+                customer_id,
+                COUNT(*) FILTER (WHERE status = 'failed' AND decline_code IS NOT NULL) AS total_declines_30d,
+                COUNT(*) FILTER (WHERE status = 'succeeded' AND type IN ('charge', 'invoice_payment')) AS total_successes_30d,
+                AVG(amount_usd) FILTER (WHERE status = 'failed') AS avg_decline_amount_30d
+            FROM transactions
+            WHERE occurred_at >= (SELECT COALESCE(MAX(occurred_at), NOW()) FROM transactions) - INTERVAL '30 days'
+            GROUP BY customer_id
+        )
+        SELECT
+            d.*,
+            COALESCE(ch.total_declines_30d, 0) AS cust_declines_30d,
+            COALESCE(ch.total_successes_30d, 0) AS cust_successes_30d,
+            COALESCE(ch.avg_decline_amount_30d, 0) AS cust_avg_decline_amt_30d
+        FROM declined d
+        LEFT JOIN customer_history ch ON d.customer_id = ch.customer_id
+        ORDER BY d.occurred_at DESC
+    """
+    df = conn.execute(query).pl()
+    if len(df) == 0:
+        return 0
+
+    df = df.with_columns(
+        [
+            pl.col("decline_code")
+            .replace_strict(decline_code_map, default=len(DECLINE_CODE_ORDER))
+            .cast(pl.Int32)
+            .alias("decline_code_enc"),
+            pl.col("card_brand")
+            .replace_strict(card_brand_map, default=len(CARD_BRAND_ORDER))
+            .cast(pl.Int32)
+            .alias("card_brand_enc"),
+            pl.col("card_funding")
+            .replace_strict(card_funding_map, default=len(CARD_FUNDING_ORDER))
+            .cast(pl.Int32)
+            .alias("card_funding_enc"),
+            pl.col("amount_usd").log1p().alias("log_amount_usd"),
+            (pl.col("amount_usd") > 250.0).cast(pl.Int32).alias("is_high_amount"),
+            pl.col("occurred_hour").alias("hour"),
+            (pl.col("occurred_hour").is_between(22, 6)).cast(pl.Int32).alias("is_night"),
+            (pl.col("occurred_hour").is_between(9, 17)).cast(pl.Int32).alias("is_business_hours"),
+            (pl.col("cust_declines_30d") > 0).cast(pl.Int32).alias("has_recent_declines"),
+            (
+                pl.col("cust_successes_30d")
+                / (pl.col("cust_declines_30d") + pl.col("cust_successes_30d") + 1)
+            ).alias("cust_success_rate_30d"),
+            pl.col("cust_avg_decline_amt_30d").log1p().alias("cust_log_avg_decline_amt"),
+            (pl.col("cust_declines_30d") > 3).cast(pl.Int32).alias("cust_high_decline_velocity"),
+        ]
+    )
+
+    dmatrix = xgb.DMatrix(df.select(feature_cols).to_pandas())
+    probs = model.predict(dmatrix)
+
+    now_ts = datetime.now(UTC)
+    pred_rows = []
+    for idx, row in enumerate(df.iter_rows(named=True)):
+        prob = float(probs[idx])
+        if prob >= 0.7:
+            action = "retry_1h"
+            retry_at = now_ts + timedelta(hours=1)
+        elif prob >= 0.4:
+            action = "retry_24h"
+            retry_at = now_ts + timedelta(hours=24)
+        elif prob >= 0.2:
+            action = "retry_72h"
+            retry_at = now_ts + timedelta(hours=72)
+        else:
+            action = "do_not_retry"
+            retry_at = None
+
+        pred_rows.append(
+            {
+                "transaction_id": row["transaction_id"],
+                "decline_code": row.get("decline_code"),
+                "card_brand": row.get("card_brand"),
+                "card_funding": row.get("card_funding"),
+                "amount_usd": float(row.get("amount_usd") or 0.0),
+                "occurred_hour": int(row.get("occurred_hour") or 0),
+                "customer_id": row.get("customer_id"),
+                "customer_retry_history": "{}",
+                "retry_success_probability": round(prob, 4),
+                "recommended_action": action,
+                "recommended_retry_at": retry_at,
+                "expected_recovery_usd": round(prob * float(row.get("amount_usd") or 0.0), 2),
+                "model_version": model_bundle.get("version", "v1"),
+                "scored_at": now_ts,
+            }
+        )
+
+    pred_df = pl.DataFrame(pred_rows)
+    conn.register("pred_staging", pred_df)
+    conn.execute("CREATE SCHEMA IF NOT EXISTS ml;")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS ml.decline_predictions (
+            transaction_id              VARCHAR PRIMARY KEY,
+            decline_code                VARCHAR,
+            card_brand                  VARCHAR,
+            card_funding                VARCHAR,
+            amount_usd                  DOUBLE,
+            occurred_hour               SMALLINT,
+            customer_id                 VARCHAR,
+            customer_retry_history      JSON,
+            retry_success_probability   DOUBLE,
+            recommended_action          VARCHAR,
+            recommended_retry_at        TIMESTAMP WITH TIME ZONE,
+            expected_recovery_usd       DOUBLE,
+            model_version               VARCHAR,
+            scored_at                   TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+    """)
+    conn.execute("INSERT OR REPLACE INTO ml.decline_predictions SELECT * FROM pred_staging")
+    return len(pred_rows)
 
 
 if __name__ == "__main__":

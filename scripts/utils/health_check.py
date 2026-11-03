@@ -11,7 +11,7 @@ Usage:
 
 import argparse
 import sys
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import duckdb
@@ -31,7 +31,18 @@ def check_data_freshness(conn: duckdb.DuckDBPyConnection, max_age_hours: int = 4
         return False
 
     latest = result[0]
-    age = datetime.utcnow() - latest
+    now = datetime.now(UTC)
+    if isinstance(latest, datetime):
+        if latest.tzinfo is None:
+            latest = latest.replace(tzinfo=UTC)
+        age = now - latest
+    else:
+        latest_dt = datetime.combine(latest, datetime.min.time(), tzinfo=UTC)
+        age = now - latest_dt
+
+    if age < timedelta(0):
+        age = timedelta(0)
+
     if age > timedelta(hours=max_age_hours):
         console.log(f"[red]FAIL[/red]: Data is stale (latest: {latest}, age: {age})")
         return False
@@ -88,9 +99,12 @@ def check_forecast_freshness(conn: duckdb.DuckDBPyConnection, max_age_hours: int
         return True  # Not a hard failure
 
     latest = result[0]
-    age = datetime.utcnow().date() - latest
-    if age.days >= 1:
-        console.log(f"[yellow]WARN[/yellow]: Forecasts are {age.days} days old")
+    now_date = datetime.now(UTC).date()
+    if isinstance(latest, datetime):
+        latest = latest.date()
+    age_days = (now_date - latest).days
+    if age_days >= 1:
+        console.log(f"[yellow]WARN[/yellow]: Forecasts are {age_days} days old")
     else:
         console.log(f"[green]OK[/green]: Forecasts fresh (latest: {latest})")
 
@@ -119,7 +133,7 @@ def main():
     parser.add_argument("--model-path", type=Path, default=Path("models"))
     args = parser.parse_args()
 
-    console.log(f"Running health check at {datetime.utcnow().isoformat()}")
+    console.log(f"Running health check at {datetime.now(UTC).isoformat()}")
 
     checks = []
 

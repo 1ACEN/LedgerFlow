@@ -21,7 +21,7 @@ import os
 import random
 import threading
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import stripe
@@ -875,7 +875,9 @@ async def stripe_webhook(
     """Receive Stripe webhook events and ingest transactions in real-time."""
     payload = await request.body()
 
-    if STRIPE_WEBHOOK_SECRET and stripe_signature:
+    if STRIPE_WEBHOOK_SECRET:
+        if not stripe_signature:
+            raise HTTPException(status_code=400, detail="Missing stripe-signature header")
         try:
             event = stripe.Webhook.construct_event(payload, stripe_signature, STRIPE_WEBHOOK_SECRET)
         except ValueError as e:
@@ -884,7 +886,7 @@ async def stripe_webhook(
         except stripe.error.SignatureVerificationError as e:
             console.log(f"[red]Invalid signature: {e}[/red]")
             raise HTTPException(status_code=400, detail="Invalid signature") from e
-        event = dict(event)
+        event = event.to_dict() if hasattr(event, "to_dict") else dict(event)
     else:
         # Dev mode: skip verification
         event = json.loads(payload)
@@ -917,7 +919,9 @@ async def plaid_webhook(
         f"[blue]Plaid webhook:[/blue] {webhook_data.get('webhook_type')} - {webhook_data.get('webhook_code')}"
     )
 
-    if PLAID_WEBHOOK_SECRET and plaid_verification:
+    if PLAID_WEBHOOK_SECRET:
+        if not plaid_verification:
+            raise HTTPException(status_code=400, detail="Missing Plaid-Verification header")
         expected = hmac.new(
             PLAID_WEBHOOK_SECRET.encode(),
             payload,
@@ -986,7 +990,7 @@ async def metrics():
             "recent_transactions": [
                 {"source": r[0], "status": r[1], "count": r[2]} for r in recent
             ],
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
     except Exception as e:
         return {"error": str(e)}

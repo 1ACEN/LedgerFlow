@@ -131,27 +131,40 @@ class TestMLModels:
         assert metrics["mae"] >= 0
 
     def test_prepare_retry_features(self, sample_db):
-        """Test feature preparation for decline retry model."""
-        # Need some failed transactions with decline codes
+        """Test feature preparation and scoring for decline retry model."""
+        from scripts.ml.train_retry import (
+            prepare_features,
+        )
+
         conn = sample_db
+        # Insert decline events and retries
         conn.execute("""
             INSERT INTO transactions
             (transaction_id, idempotency_key, occurred_at, posted_at, type, status, source,
-             amount, currency, fx_rate, net_amount, fee_amount, customer_id, basis, decline_code)
+             amount, currency, fx_rate, net_amount, fee_amount, customer_id, basis, decline_code,
+             metadata_json, amount_usd, net_amount_usd, fee_amount_usd)
             SELECT
                 'txn_fail_' || row_number() OVER (),
                 'idem_fail_' || row_number() OVER (),
-                NOW() - INTERVAL '30 days' + INTERVAL '1 day' * row_number() OVER (),
-                NOW() - INTERVAL '30 days' + INTERVAL '1 day' * row_number() OVER (),
+                NOW() - INTERVAL '150 days' + INTERVAL '1 hour' * row_number() OVER (),
+                NOW() - INTERVAL '150 days' + INTERVAL '1 hour' * row_number() OVER (),
                 'charge', 'failed', 'stripe',
                 5000, 'USD', 1.0, 5000, 0,
-                'cus_001', 'cash',
-                (ARRAY['insufficient_funds','card_declined','expired_card'])[1 + (row_number() OVER () % 3)]
-            FROM generate_series(1, 50)
+                'cus_' || LPAD((row_number() OVER () % 10 + 1)::VARCHAR, 3, '0'),
+                'cash',
+                (ARRAY['insufficient_funds','card_declined','expired_card','processing_error'])[1 + (row_number() OVER () % 4)],
+                '{"card_brand": "Visa", "card_funding": "credit"}',
+                50.0, 50.0, 0.0
+            FROM generate_series(1, 150)
         """)
 
-        # This will fail because we don't have the full schema, but let's test the function exists
-        # In real testing, we'd need a more complete setup
+        X_train, y_train, X_val, y_val, feature_cols, val_df = prepare_features(conn)
+        assert len(X_train) > 0
+        assert len(X_val) > 0
+        assert "decline_code_enc" in feature_cols
+        assert "card_brand_enc" in feature_cols
+        assert "card_funding_enc" in feature_cols
+        assert "log_amount_usd" in feature_cols
 
 
 if __name__ == "__main__":

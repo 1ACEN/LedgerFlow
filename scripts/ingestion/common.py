@@ -275,7 +275,12 @@ def normalize_stripe_event(event: dict, stripe_account_id: str) -> dict | None:
     elif txn_type == "refund":
         fee_amount = -int(amount * 0.029)
 
-    net_amount = amount - fee_amount if txn_type == "charge" else amount
+    if txn_type in ("refund", "payout", "fee"):
+        net_amount = -abs(amount)
+    elif txn_type == "charge" and status == "succeeded":
+        net_amount = amount - fee_amount
+    else:
+        net_amount = amount
 
     base = {
         "transaction_id": txn_id,
@@ -351,6 +356,7 @@ def normalize_plaid_transaction(txn: dict, account_id: str) -> dict | None:
     # Amount: Plaid positive = debit (outflow), negative = credit (inflow)
     amount_cents = int(abs(txn.get("amount", 0) * 100))
     is_credit = txn.get("amount", 0) < 0
+    net_amount = amount_cents if is_credit else -amount_cents
 
     occurred_at = datetime.combine(
         datetime.strptime(txn.get("date"), "%Y-%m-%d").date(),
@@ -368,7 +374,7 @@ def normalize_plaid_transaction(txn: dict, account_id: str) -> dict | None:
         "amount": amount_cents,
         "currency": txn.get("iso_currency_code") or "USD",
         "fx_rate": 1.0,
-        "net_amount": amount_cents,
+        "net_amount": net_amount,
         "fee_amount": 0,
         "customer_id": None,
         "merchant_account_id": account_id,

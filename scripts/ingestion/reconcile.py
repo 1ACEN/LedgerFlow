@@ -63,18 +63,18 @@ def main():
                 bd.transaction_id AS bank_txn_id,
                 sp.posted_date AS stripe_date,
                 bd.posted_date AS bank_date,
-                sp.net_amount_usd AS stripe_amount,
+                ABS(sp.net_amount_usd) AS stripe_amount,
                 bd.net_amount_usd AS bank_amount,
-                sp.net_amount_usd - bd.net_amount_usd AS diff_usd,
+                ABS(sp.net_amount_usd) - bd.net_amount_usd AS diff_usd,
                 CASE
-                    WHEN ABS(sp.net_amount_usd - bd.net_amount_usd) < 0.01 THEN 'matched'
-                    WHEN ABS(sp.net_amount_usd - bd.net_amount_usd) < 1.00 THEN 'minor_diff'
+                    WHEN ABS(ABS(sp.net_amount_usd) - bd.net_amount_usd) < 0.01 THEN 'matched'
+                    WHEN ABS(ABS(sp.net_amount_usd) - bd.net_amount_usd) < 1.00 THEN 'minor_diff'
                     ELSE 'major_diff'
                 END AS match_status
             FROM stripe_payouts sp
             LEFT JOIN bank_deposits bd
                 ON bd.posted_date BETWEEN sp.posted_date AND sp.posted_date + INTERVAL '2 days'
-               AND ABS(bd.net_amount_usd - sp.net_amount_usd) < 1000  -- Within $1000
+               AND ABS(bd.net_amount_usd - ABS(sp.net_amount_usd)) < 1000  -- Within $1000
             WHERE bd.transaction_id IS NOT NULL
         ),
         unmatched_stripe AS (
@@ -82,7 +82,7 @@ def main():
             WHERE NOT EXISTS (
                 SELECT 1 FROM bank_deposits bd
                 WHERE bd.posted_date BETWEEN sp.posted_date AND sp.posted_date + INTERVAL '2 days'
-                  AND ABS(bd.net_amount_usd - sp.net_amount_usd) < 1000
+                  AND ABS(bd.net_amount_usd - ABS(sp.net_amount_usd)) < 1000
             )
         ),
         unmatched_bank AS (
@@ -90,7 +90,7 @@ def main():
             WHERE NOT EXISTS (
                 SELECT 1 FROM stripe_payouts sp
                 WHERE bd.posted_date BETWEEN sp.posted_date AND sp.posted_date + INTERVAL '2 days'
-                  AND ABS(bd.net_amount_usd - sp.net_amount_usd) < 1000
+                  AND ABS(bd.net_amount_usd - ABS(sp.net_amount_usd)) < 1000
             )
         )
         SELECT 'matched' AS category, COUNT(*) AS count, SUM(diff_usd) AS total_diff FROM matched
@@ -112,21 +112,21 @@ def main():
             bd.transaction_id AS bank_txn_id,
             sp.posted_date AS stripe_date,
             bd.posted_date AS bank_date,
-            sp.net_amount_usd AS stripe_amount,
+            ABS(sp.net_amount_usd) AS stripe_amount,
             bd.net_amount_usd AS bank_amount,
-            sp.net_amount_usd - bd.net_amount_usd AS diff_usd
+            ABS(sp.net_amount_usd) - bd.net_amount_usd AS diff_usd
         FROM transactions sp
         LEFT JOIN transactions bd
             ON bd.source = 'plaid'
            AND bd.net_amount_usd > 0
            AND bd.posted_date BETWEEN sp.posted_date AND sp.posted_date + INTERVAL '2 days'
-           AND ABS(bd.net_amount_usd - sp.net_amount_usd) < 1000
+           AND ABS(bd.net_amount_usd - ABS(sp.net_amount_usd)) < 1000
         WHERE sp.source = 'stripe'
           AND sp.type = 'payout'
           AND sp.status = 'succeeded'
           AND sp.posted_date >= CURRENT_DATE - INTERVAL '{args.days} days'
-          AND (bd.transaction_id IS NULL OR ABS(sp.net_amount_usd - bd.net_amount_usd) >= 1.00)
-        ORDER BY ABS(sp.net_amount_usd - COALESCE(bd.net_amount_usd, 0)) DESC
+          AND (bd.transaction_id IS NULL OR ABS(ABS(sp.net_amount_usd) - bd.net_amount_usd) >= 1.00)
+        ORDER BY ABS(ABS(sp.net_amount_usd) - COALESCE(bd.net_amount_usd, 0)) DESC
     """
 
     discrepancies = conn.execute(detail_query).pl()

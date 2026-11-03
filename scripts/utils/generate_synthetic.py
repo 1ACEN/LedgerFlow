@@ -11,8 +11,10 @@ Usage:
 
 import argparse
 import random
+import shutil
 import sys
-from datetime import datetime, timedelta
+import uuid
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import duckdb
@@ -146,13 +148,7 @@ def generate_transactions(
 
     # Pre-generate arrays for speed
     transaction_ids = [f"txn_{i:08d}" for i in range(1, n_rows + 1)]
-    idempotency_keys = [f"idem_{fake.uuid4()}" for _ in range(n_rows)]
-    occurred_ats = [random_date(start_date, end_date) for _ in range(n_rows)]
-    # Posted date is 0-2 days after occurred
-    posted_ats = [
-        oa + timedelta(days=random.randint(0, 2), hours=random.randint(0, 23))
-        for oa in occurred_ats
-    ]
+    idempotency_keys = [f"idem_{uuid.uuid4()}" for _ in range(n_rows)]
 
     # Type distribution: charges, refunds, payouts, fees, transfers
     type_weights = {
@@ -165,6 +161,41 @@ def generate_transactions(
         "adjustment": 0.02,
     }
     types = np.random.choice(list(type_weights.keys()), n_rows, p=list(type_weights.values()))
+
+    total_span_sec = max(1.0, (end_date - start_date).total_seconds())
+    total_span_days = total_span_sec / 86400.0
+
+    occurred_ats = []
+    for t in types:
+        if t == "invoice_payment":
+            # Calibrated AR aging distribution:
+            # ~50% Current (0-30d), ~25% 31-60d, ~15% 61-90d, ~10% 90+d
+            bucket = np.random.choice(
+                ["current", "days_31_60", "days_61_90", "days_90_plus"],
+                p=[0.50, 0.25, 0.15, 0.10],
+            )
+            if bucket == "current":
+                days_back = random.uniform(0.0, min(30.0, total_span_days))
+            elif bucket == "days_31_60":
+                days_back = random.uniform(min(30.0, total_span_days), min(60.0, total_span_days))
+            elif bucket == "days_61_90":
+                days_back = random.uniform(min(60.0, total_span_days), min(90.0, total_span_days))
+            else:
+                days_back = random.uniform(min(90.0, total_span_days), total_span_days)
+            oa = end_date - timedelta(days=days_back)
+        else:
+            # Steady linear business volume growth: p(u) ~ 1 + 0.35 * u, u in [0, 1]
+            # Inverted CDF avoids small initial month and provides smooth MoM growth
+            r = random.random()
+            u = (-1.0 + (1.0 + 0.7 * r) ** 0.5) / 0.35
+            oa = start_date + timedelta(seconds=u * total_span_sec)
+        occurred_ats.append(oa)
+
+    # Posted date is 0-2 days after occurred
+    posted_ats = [
+        oa + timedelta(days=random.randint(0, 2), hours=random.randint(0, 23))
+        for oa in occurred_ats
+    ]
 
     # Status depends on type
     statuses = []
@@ -258,7 +289,8 @@ def generate_transactions(
     product_lines = np.random.choice(PRODUCT_LINES, n_rows, p=[0.4, 0.15, 0.15, 0.15, 0.15])
     departments = np.random.choice(DEPARTMENTS, n_rows, p=[0.25, 0.2, 0.15, 0.15, 0.15, 0.1])
     account_codes = [ACCOUNT_CODES.get(pl, "9999-unknown") for pl in product_lines]
-    cost_centers = [f"CC-{fake.bothify('??-###')}" for _ in range(n_rows)]
+    cc_pool = [f"CC-{fake.bothify('??-###')}" for _ in range(50)]
+    cost_centers = list(np.random.choice(cc_pool, n_rows))
 
     # Basis: payouts and fees are primarily cash movements
     basis = []
@@ -283,29 +315,35 @@ def generate_transactions(
             risk_levels.append("normal")
 
         if statuses[i] == "disputed":
-            dispute_ids.append(f"dp_{fake.uuid4()[:12]}")
+            dispute_ids.append(f"dp_{uuid.uuid4().hex[:12]}")
             dispute_statuses.append(np.random.choice(DISPUTE_STATUSES))
         else:
             dispute_ids.append(None)
             dispute_statuses.append(None)
 
-    # Descriptions
+    # Descriptions (pre-generated pools for fast vectorized synthesis)
+    bs_pool = [fake.bs() for _ in range(100)]
+    company_pool = [fake.company() for _ in range(50)]
+    name_pool = [fake.name() for _ in range(50)]
+    sentence_pool = [fake.sentence() for _ in range(50)]
     descriptions = []
     for i in range(n_rows):
         t = types[i]
         if t == "charge":
-            descriptions.append(f"{product_lines[i].replace('_', ' ').title()} - {fake.bs()}")
+            descriptions.append(
+                f"{product_lines[i].replace('_', ' ').title()} - {random.choice(bs_pool)}"
+            )
         elif t == "refund":
             descriptions.append(f"Refund for {product_lines[i].replace('_', ' ')}")
         elif t == "payout":
             descriptions.append(
                 random.choice(
                     [
-                        f"Vendor Payout - {fake.company()}",
+                        f"Vendor Payout - {random.choice(company_pool)}",
                         "Cloud Infrastructure - AWS / GCP",
-                        f"Merchant Settlement - {fake.bothify('acct_###')}",
-                        f"Contractor Disbursement - {fake.name()}",
-                        f"Payout to bank account ending in {fake.bothify('####')}",
+                        f"Merchant Settlement - acct_{random.randint(100, 999)}",
+                        f"Contractor Disbursement - {random.choice(name_pool)}",
+                        f"Payout to bank account ending in {random.randint(1000, 9999)}",
                         "SaaS Software Subscription & Tooling",
                         "Office Facilities & Operating Expense",
                     ]
@@ -314,21 +352,21 @@ def generate_transactions(
         elif t == "fee":
             descriptions.append(f"Payment processing fee - {product_lines[i]}")
         elif t == "transfer":
-            descriptions.append(f"Treasury bank sweep - {fake.bothify('acct_###')}")
+            descriptions.append(f"Treasury bank sweep - acct_{random.randint(100, 999)}")
         else:
-            descriptions.append(fake.sentence())
+            descriptions.append(random.choice(sentence_pool))
 
     # Metadata JSON
     card_brands = np.random.choice(CARD_BRANDS, n_rows)
     card_fundings = np.random.choice(["credit", "debit", "prepaid"], n_rows, p=[0.7, 0.25, 0.05])
     metadata_json = [
-        f'{{"source_internal_id": "{fake.uuid4()}", "card_brand": "{card_brands[i]}", "card_funding": "{card_fundings[i]}"}}'
+        f'{{"source_internal_id": "{uuid.uuid4()}", "card_brand": "{card_brands[i]}", "card_funding": "{card_fundings[i]}"}}'
         for i in range(n_rows)
     ]
 
     # Ingestion metadata
-    ingested_at = [datetime.utcnow() for _ in range(n_rows)]
-    batch_ids = [f"batch_{fake.uuid4()[:8]}" for _ in range(n_rows)]
+    ingested_at = [datetime.now(UTC) for _ in range(n_rows)]
+    batch_ids = [f"batch_{uuid.uuid4().hex[:8]}" for _ in range(n_rows)]
 
     # Build DataFrame
     df = pl.DataFrame(
@@ -402,6 +440,8 @@ def write_to_duckdb(df: pl.DataFrame, db_path: Path) -> None:
 
     # Write partitioned by month
     parquet_dir = db_path.parent / "transactions"
+    if parquet_dir.exists():
+        shutil.rmtree(parquet_dir, ignore_errors=True)
     df.write_parquet(
         parquet_dir,
         partition_by=["occurred_year", "occurred_month"],
@@ -410,6 +450,12 @@ def write_to_duckdb(df: pl.DataFrame, db_path: Path) -> None:
 
     from scripts.db.init_db import SCHEMA_SQL
     from scripts.ingestion.common import _INSERT_COLS
+
+    if db_path.exists():
+        db_path.unlink()
+    wal_path = Path(str(db_path) + ".wal")
+    if wal_path.exists():
+        wal_path.unlink()
 
     conn = duckdb.connect(str(db_path))
 
@@ -448,8 +494,10 @@ def main():
     np.random.seed(args.seed)
     Faker.seed(args.seed)
 
-    end_date = datetime.utcnow().replace(hour=23, minute=59, second=59, microsecond=0)
-    start_date = end_date - timedelta(days=args.days)
+    end_date = datetime.now(UTC).replace(hour=23, minute=59, second=59, microsecond=0)
+    # Align to 1st of starting month to ensure a complete baseline month (prevents +438% MoM growth spike)
+    base_start = end_date - timedelta(days=args.days)
+    start_date = base_start.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     console.rule("[bold blue]LedgerFlow Synthetic Data Generator[/bold blue]")
 

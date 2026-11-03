@@ -174,9 +174,9 @@ CREATE OR REPLACE VIEW analytics.monthly_pl AS
 SELECT
     DATE_TRUNC('month', occurred_at)::DATE AS month,
     account_code,
-    SUM(CASE WHEN amount_usd > 0 THEN amount_usd ELSE 0 END) AS credit_usd,
-    SUM(CASE WHEN amount_usd < 0 THEN -amount_usd ELSE 0 END) AS debit_usd,
-    SUM(amount_usd) AS net_usd
+    SUM(CASE WHEN net_amount_usd > 0 THEN net_amount_usd ELSE 0 END) AS credit_usd,
+    SUM(CASE WHEN net_amount_usd < 0 THEN -net_amount_usd ELSE 0 END) AS debit_usd,
+    SUM(net_amount_usd) AS net_usd
 FROM transactions
 WHERE basis = 'accrual' AND status = 'succeeded'
 GROUP BY DATE_TRUNC('month', occurred_at), account_code

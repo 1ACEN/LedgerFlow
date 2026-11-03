@@ -10,7 +10,7 @@ Usage:
 """
 
 import argparse
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import duckdb
@@ -33,7 +33,7 @@ def load_model(model_path: Path) -> dict:
 def prepare_latest_features(conn: duckdb.DuckDBPyConnection, feature_cols: list) -> np.ndarray:
     """Prepare feature vector for the most recent date."""
 
-    # Get the last 30 days of daily cash flow data (same as training)
+    # Get the last 90 days of daily cash flow data relative to latest data
     query = """
         SELECT
             posted_date,
@@ -49,7 +49,7 @@ def prepare_latest_features(conn: duckdb.DuckDBPyConnection, feature_cols: list)
         FROM transactions
         WHERE basis = 'cash'
           AND status = 'succeeded'
-          AND posted_date >= CURRENT_DATE - INTERVAL '60 days'
+          AND posted_date >= (SELECT COALESCE(MAX(posted_date), CURRENT_DATE) FROM transactions) - INTERVAL '90 days'
         GROUP BY posted_date
         ORDER BY posted_date
     """
@@ -148,7 +148,7 @@ def generate_forecast(
 
         predictions.append(
             {
-                "forecast_date": datetime.utcnow().date(),
+                "forecast_date": datetime.now(UTC).date(),
                 "prediction_date": pred_date,
                 "horizon_days": h,
                 "p10_net_flow_usd": float(p10),

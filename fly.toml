@@ -68,5 +68,5 @@ primary_region = "iad"
 
 # Release command (runs before new version gets traffic)
 [deploy]
-  release_command = "python scripts/migrate.py --db $DUCKDB_PATH"
+  release_command = "python scripts/db/migrate.py --db $DUCKDB_PATH"
   strategy = "rolling"
