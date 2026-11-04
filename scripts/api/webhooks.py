@@ -601,7 +601,7 @@ async def report_executive():
 
             # 6-Month Comparison for Revenue vs Expenses Comparison Chart
             monthly_comp = conn.execute("""
-                SELECT 
+                SELECT
                     DATE_TRUNC('month', occurred_at)::DATE AS month,
                     ROUND(COALESCE(SUM(amount_usd) FILTER (WHERE type IN ('charge', 'invoice_payment') AND status = 'succeeded'), 0.0), 2) AS revenue,
                     ROUND(COALESCE(SUM(amount_usd) FILTER (WHERE type IN ('payout', 'fee') AND status = 'succeeded') + COALESCE(SUM(amount_usd) FILTER (WHERE type = 'refund' AND status = 'succeeded'), 0.0), 0.0), 2) AS expenses,
@@ -638,7 +638,7 @@ async def report_executive():
 
             # Risk Indicators: AR Delinquency & Disputes
             ar_stats = conn.execute("""
-                SELECT 
+                SELECT
                     COALESCE(SUM(total_outstanding_usd), 0.0) AS total_ar,
                     COALESCE(SUM(days_90_plus_usd), 0.0) AS overdue_90
                 FROM analytics.ar_aging
@@ -819,7 +819,7 @@ async def report_cashflow():
 
             # 30-day aggregated cash flow movements
             flow_30d = conn.execute("""
-                SELECT 
+                SELECT
                     SUM(inflows_usd),
                     SUM(outflows_usd),
                     SUM(net_flow_usd)
@@ -836,7 +836,7 @@ async def report_cashflow():
 
             # Inflows breakdown by product line / source
             inflow_rows = conn.execute("""
-                SELECT 
+                SELECT
                     COALESCE(product_line, 'Direct Payments') as product,
                     ROUND(SUM(amount_usd), 2) as total_usd
                 FROM transactions
@@ -858,7 +858,7 @@ async def report_cashflow():
 
             # Outflows breakdown by use / category
             outflow_rows = conn.execute("""
-                SELECT 
+                SELECT
                     type as category,
                     ROUND(SUM(amount_usd), 2) as total_usd
                 FROM transactions
@@ -893,7 +893,7 @@ async def report_cashflow():
 
             # Historical Monthly Cash Flow Trends (12 months)
             monthly_rows = conn.execute("""
-                SELECT 
+                SELECT
                     STRFTIME(date, '%Y-%m') as month,
                     ROUND(SUM(inflows_usd), 2) as inflows,
                     ROUND(SUM(outflows_usd), 2) as outflows,
@@ -917,7 +917,7 @@ async def report_cashflow():
 
             # Historical Quarterly Cash Flow Trends (5 quarters)
             quarterly_rows = conn.execute("""
-                SELECT 
+                SELECT
                     CAST(EXTRACT(YEAR FROM date) AS VARCHAR) || '-Q' || CAST(EXTRACT(QUARTER FROM date) AS VARCHAR) as quarter,
                     ROUND(SUM(inflows_usd), 2) as inflows,
                     ROUND(SUM(outflows_usd), 2) as outflows,
@@ -941,7 +941,7 @@ async def report_cashflow():
 
             # 30-Day Daily Historical Actuals
             actual_rows = conn.execute("""
-                SELECT 
+                SELECT
                     date,
                     inflows_usd,
                     outflows_usd,
@@ -968,7 +968,7 @@ async def report_cashflow():
 
             # Forecast scenario meta
             fc_meta = conn.execute("""
-                SELECT 
+                SELECT
                     p10_runway_days,
                     p50_runway_days,
                     p90_runway_days,
@@ -1118,7 +1118,7 @@ async def report_revenue():
 
             # 2. Expenses breakdown by department
             exp_dept_rows = conn.execute("""
-                SELECT 
+                SELECT
                     COALESCE(department, 'operations') as dept,
                     ROUND(SUM(amount_usd), 2) as total_usd,
                     COUNT(*) as count
@@ -1150,7 +1150,7 @@ async def report_revenue():
 
             # 3. Revenue by Customer Tier
             tier_rows = conn.execute("""
-                SELECT 
+                SELECT
                     COALESCE(c.plan, 'standard') as customer_tier,
                     COUNT(DISTINCT c.customer_id) as customer_count,
                     ROUND(SUM(t.amount_usd), 2) as total_usd,
@@ -1185,7 +1185,7 @@ async def report_revenue():
 
             # 4. Top 6 Enterprise & High-Volume Customers
             top_cust_rows = conn.execute("""
-                SELECT 
+                SELECT
                     c.customer_name,
                     c.plan,
                     c.country,
@@ -1213,7 +1213,7 @@ async def report_revenue():
 
             # 5. Financial Performance Trends (12 Months)
             monthly_perf_rows = conn.execute("""
-                SELECT 
+                SELECT
                     STRFTIME(month, '%Y-%m') as mo,
                     ROUND(SUM(revenue_usd), 2) as gross_rev,
                     ROUND(SUM(net_revenue_usd), 2) as net_rev
@@ -1434,7 +1434,7 @@ async def report_ops():
 
             # 1. Real-time Transaction Monitoring
             tx_stats = conn.execute("""
-                SELECT 
+                SELECT
                     COUNT(*) as total_tx,
                     ROUND(SUM(amount_usd), 2) as total_volume,
                     SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END) as succeeded,
@@ -1454,7 +1454,7 @@ async def report_ops():
 
             # 2. Payment Processing Gateways
             gateway_rows = conn.execute("""
-                SELECT 
+                SELECT
                     source,
                     COUNT(*) as total_tx,
                     ROUND(SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) as success_pct,
@@ -1488,7 +1488,7 @@ async def report_ops():
 
             # 3. Fraud / Risk Indicators
             risk_counts = conn.execute("""
-                SELECT 
+                SELECT
                     SUM(CASE WHEN risk_level = 'normal' OR risk_level IS NULL THEN 1 ELSE 0 END) as normal_cnt,
                     SUM(CASE WHEN risk_level = 'elevated' THEN 1 ELSE 0 END) as elevated_cnt,
                     SUM(CASE WHEN risk_level = 'highest' THEN 1 ELSE 0 END) as highest_cnt
@@ -1502,7 +1502,7 @@ async def report_ops():
             dispute_rate_bps = round((disputed_tx / (succeeded_tx or 1)) * 10000, 1)
 
             disp_counts = conn.execute("""
-                SELECT 
+                SELECT
                     SUM(CASE WHEN dispute_status = 'won' THEN 1 ELSE 0 END),
                     SUM(CASE WHEN dispute_status = 'lost' THEN 1 ELSE 0 END),
                     SUM(CASE WHEN dispute_status LIKE 'warning%' THEN 1 ELSE 0 END),
@@ -1517,7 +1517,7 @@ async def report_ops():
 
             # 4. Automation & ML Recovery Performance
             retry_summary = conn.execute("""
-                SELECT 
+                SELECT
                     COUNT(*),
                     ROUND(SUM(expected_recovery_usd), 2),
                     SUM(CASE WHEN retry_success_probability >= 0.7 THEN 1 ELSE 0 END),
