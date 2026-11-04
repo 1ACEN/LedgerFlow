@@ -88,10 +88,7 @@ def _date_fields(dt: datetime) -> dict:
 # CORE WRITE FUNCTION
 # =============================================================================
 
-# Columns that are GENERATED ALWAYS in DuckDB — must never be in INSERT list
-_GENERATED_COLS = {"amount_usd", "net_amount_usd", "fee_amount_usd"}
-
-# Generated columns in DuckDB — computed automatically from amount * fx_rate / 100.0
+# Columns that are GENERATED ALWAYS in DuckDB — computed automatically from amount * fx_rate / 100.0
 _GENERATED_COLS = {"amount_usd", "net_amount_usd", "fee_amount_usd"}
 
 # Explicit ordered list of insertable columns (matches schema in init_db.py)

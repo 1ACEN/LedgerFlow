@@ -594,10 +594,18 @@ async def report_executive():
             total_rev_30d = float(fin_30d[0] or 0.0) if fin_30d else 0.0
             total_exp_30d = float(fin_30d[1] or 0.0) if fin_30d else 0.0
             fees_30d = float(fin_30d[2] or 0.0) if fin_30d else 0.0
-            net_profit_30d = float(fin_30d[3] or (total_rev_30d - total_exp_30d)) if fin_30d else 0.0
+            net_profit_30d = (
+                float(fin_30d[3] or (total_rev_30d - total_exp_30d)) if fin_30d else 0.0
+            )
 
-            gross_margin_pct = round(((total_rev_30d - fees_30d) / total_rev_30d * 100.0), 1) if total_rev_30d > 0 else 0.0
-            net_margin_pct = round((net_profit_30d / total_rev_30d * 100.0), 1) if total_rev_30d > 0 else 0.0
+            gross_margin_pct = (
+                round(((total_rev_30d - fees_30d) / total_rev_30d * 100.0), 1)
+                if total_rev_30d > 0
+                else 0.0
+            )
+            net_margin_pct = (
+                round((net_profit_30d / total_rev_30d * 100.0), 1) if total_rev_30d > 0 else 0.0
+            )
 
             # 6-Month Comparison for Revenue vs Expenses Comparison Chart
             monthly_comp = conn.execute("""
@@ -621,7 +629,9 @@ async def report_executive():
                             "revenue": round(r[1] or 0.0, 2),
                             "expenses": round(r[2] or 0.0, 2),
                             "net_profit": round(r[3] or 0.0, 2),
-                            "margin_pct": round(((r[3] or 0.0) / (r[1] or 1.0)) * 100.0, 1) if (r[1] or 0.0) > 0 else 0.0,
+                            "margin_pct": round(((r[3] or 0.0) / (r[1] or 1.0)) * 100.0, 1)
+                            if (r[1] or 0.0) > 0
+                            else 0.0,
                         }
                         for r in monthly_comp
                     ]
@@ -660,78 +670,98 @@ async def report_executive():
 
             alerts = []
             if runway_days >= 180:
-                alerts.append({
-                    "id": "runway",
-                    "type": "positive",
-                    "title": "Healthy Runway Buffer",
-                    "message": f"ML cash forecast projects {runway_days} days (~{runway_days // 30} months) of operational buffer.",
-                })
+                alerts.append(
+                    {
+                        "id": "runway",
+                        "type": "positive",
+                        "title": "Healthy Runway Buffer",
+                        "message": f"ML cash forecast projects {runway_days} days (~{runway_days // 30} months) of operational buffer.",
+                    }
+                )
             elif runway_days >= 90:
-                alerts.append({
-                    "id": "runway",
-                    "type": "warning",
-                    "title": "Moderate Runway Watch",
-                    "message": f"Projected runway is {runway_days} days. Monitor discretionary outflows and burn velocity.",
-                })
+                alerts.append(
+                    {
+                        "id": "runway",
+                        "type": "warning",
+                        "title": "Moderate Runway Watch",
+                        "message": f"Projected runway is {runway_days} days. Monitor discretionary outflows and burn velocity.",
+                    }
+                )
             else:
-                alerts.append({
-                    "id": "runway",
-                    "type": "danger",
-                    "title": "Runway Warning",
-                    "message": f"Runway is critically tight at {runway_days} days. Working capital action advised.",
-                })
+                alerts.append(
+                    {
+                        "id": "runway",
+                        "type": "danger",
+                        "title": "Runway Warning",
+                        "message": f"Runway is critically tight at {runway_days} days. Working capital action advised.",
+                    }
+                )
 
             if net_margin_pct >= 20.0:
-                alerts.append({
-                    "id": "profitability",
-                    "type": "positive",
-                    "title": "Strong Net Operating Margins",
-                    "message": f"Trailing 30-day net margin is healthy at {net_margin_pct}% (${round(net_profit_30d/1000, 1)}k net).",
-                })
+                alerts.append(
+                    {
+                        "id": "profitability",
+                        "type": "positive",
+                        "title": "Strong Net Operating Margins",
+                        "message": f"Trailing 30-day net margin is healthy at {net_margin_pct}% (${round(net_profit_30d / 1000, 1)}k net).",
+                    }
+                )
             elif net_margin_pct > 0:
-                alerts.append({
-                    "id": "profitability",
-                    "type": "info",
-                    "title": "Positive Operating Cash",
-                    "message": f"Net margin is positive at {net_margin_pct}% on ${round(total_rev_30d/1000, 1)}k gross revenue.",
-                })
+                alerts.append(
+                    {
+                        "id": "profitability",
+                        "type": "info",
+                        "title": "Positive Operating Cash",
+                        "message": f"Net margin is positive at {net_margin_pct}% on ${round(total_rev_30d / 1000, 1)}k gross revenue.",
+                    }
+                )
             else:
-                alerts.append({
-                    "id": "profitability",
-                    "type": "warning",
-                    "title": "Net Operating Deficit",
-                    "message": "Expenses exceeded gross revenues in the trailing 30-day window.",
-                })
+                alerts.append(
+                    {
+                        "id": "profitability",
+                        "type": "warning",
+                        "title": "Net Operating Deficit",
+                        "message": "Expenses exceeded gross revenues in the trailing 30-day window.",
+                    }
+                )
 
             if overdue_90_pct > 20.0:
-                alerts.append({
-                    "id": "ar_overdue",
-                    "type": "warning",
-                    "title": "Elevated AR Delinquency",
-                    "message": f"{overdue_90_pct}% (${round(overdue_90/1000, 1)}k) of outstanding receivables are in the 90+ day bucket.",
-                })
+                alerts.append(
+                    {
+                        "id": "ar_overdue",
+                        "type": "warning",
+                        "title": "Elevated AR Delinquency",
+                        "message": f"{overdue_90_pct}% (${round(overdue_90 / 1000, 1)}k) of outstanding receivables are in the 90+ day bucket.",
+                    }
+                )
             else:
-                alerts.append({
-                    "id": "ar_overdue",
-                    "type": "positive",
-                    "title": "Low Receivables Risk",
-                    "message": f"Overdue 90+ accounts represent only {overdue_90_pct}% of open collections (${round(total_ar/1000, 1)}k total).",
-                })
+                alerts.append(
+                    {
+                        "id": "ar_overdue",
+                        "type": "positive",
+                        "title": "Low Receivables Risk",
+                        "message": f"Overdue 90+ accounts represent only {overdue_90_pct}% of open collections (${round(total_ar / 1000, 1)}k total).",
+                    }
+                )
 
             if gw_rate >= 95.0:
-                alerts.append({
-                    "id": "gateway",
-                    "type": "positive",
-                    "title": "Optimal Payment Routing",
-                    "message": f"Payment authorization rate is optimal at {gw_rate}% across primary processing rails.",
-                })
+                alerts.append(
+                    {
+                        "id": "gateway",
+                        "type": "positive",
+                        "title": "Optimal Payment Routing",
+                        "message": f"Payment authorization rate is optimal at {gw_rate}% across primary processing rails.",
+                    }
+                )
             else:
-                alerts.append({
-                    "id": "gateway",
-                    "type": "warning",
-                    "title": "Elevated Card Declines",
-                    "message": f"Gateway authorization rate is {gw_rate}%. Automated decline routing advisor is engaged.",
-                })
+                alerts.append(
+                    {
+                        "id": "gateway",
+                        "type": "warning",
+                        "title": "Elevated Card Declines",
+                        "message": f"Gateway authorization rate is {gw_rate}%. Automated decline routing advisor is engaged.",
+                    }
+                )
 
         return {
             "current_cash": round(cash[0] or 0, 2) if cash else 0,
@@ -849,7 +879,7 @@ async def report_cashflow():
             total_in = sum(r[1] for r in inflow_rows) or 1.0
             inflows_breakdown = [
                 {
-                    "category": r[0].replace('_', ' ').title(),
+                    "category": r[0].replace("_", " ").title(),
                     "amount": round(r[1], 2),
                     "percentage": round((r[1] / total_in) * 100, 1),
                 }
@@ -869,11 +899,11 @@ async def report_cashflow():
             """).fetchall()
             total_out = sum(r[1] for r in outflow_rows) or 1.0
             label_map = {
-                'payout': 'Vendor & Merchant Payouts',
-                'fee': 'Gateway & Processing Fees',
-                'refund': 'Customer Refunds & Disputes',
-                'transfer': 'Inter-Account Transfers',
-                'adjustment': 'Ledger Adjustments',
+                "payout": "Vendor & Merchant Payouts",
+                "fee": "Gateway & Processing Fees",
+                "refund": "Customer Refunds & Disputes",
+                "transfer": "Inter-Account Transfers",
+                "adjustment": "Ledger Adjustments",
             }
             outflows_breakdown = [
                 {
@@ -886,8 +916,8 @@ async def report_cashflow():
 
             # Operating and Free cash flow calculations
             charges_in = sum(r[1] for r in inflow_rows)
-            fees_out = sum(r[1] for r in outflow_rows if r[0] in ('fee', 'refund'))
-            payouts_out = sum(r[1] for r in outflow_rows if r[0] in ('payout', 'transfer'))
+            fees_out = sum(r[1] for r in outflow_rows if r[0] in ("fee", "refund"))
+            payouts_out = sum(r[1] for r in outflow_rows if r[0] in ("payout", "transfer"))
             operating_cash_flow_30d = round(charges_in - fees_out, 2)
             free_cash_flow_30d = round(operating_cash_flow_30d - payouts_out, 2)
 
@@ -904,16 +934,20 @@ async def report_cashflow():
                 ORDER BY month DESC
                 LIMIT 12
             """).fetchall()
-            monthly_trends = list(reversed([
-                {
-                    "period": r[0],
-                    "inflows": float(r[1] or 0),
-                    "outflows": float(r[2] or 0),
-                    "net_flow": float(r[3] or 0),
-                    "ending_cash": float(r[4] or 0),
-                }
-                for r in monthly_rows
-            ]))
+            monthly_trends = list(
+                reversed(
+                    [
+                        {
+                            "period": r[0],
+                            "inflows": float(r[1] or 0),
+                            "outflows": float(r[2] or 0),
+                            "net_flow": float(r[3] or 0),
+                            "ending_cash": float(r[4] or 0),
+                        }
+                        for r in monthly_rows
+                    ]
+                )
+            )
 
             # Historical Quarterly Cash Flow Trends (5 quarters)
             quarterly_rows = conn.execute("""
@@ -928,16 +962,20 @@ async def report_cashflow():
                 ORDER BY quarter DESC
                 LIMIT 6
             """).fetchall()
-            quarterly_trends = list(reversed([
-                {
-                    "period": r[0],
-                    "inflows": float(r[1] or 0),
-                    "outflows": float(r[2] or 0),
-                    "net_flow": float(r[3] or 0),
-                    "ending_cash": float(r[4] or 0),
-                }
-                for r in quarterly_rows
-            ]))
+            quarterly_trends = list(
+                reversed(
+                    [
+                        {
+                            "period": r[0],
+                            "inflows": float(r[1] or 0),
+                            "outflows": float(r[2] or 0),
+                            "net_flow": float(r[3] or 0),
+                            "ending_cash": float(r[4] or 0),
+                        }
+                        for r in quarterly_rows
+                    ]
+                )
+            )
 
             # 30-Day Daily Historical Actuals
             actual_rows = conn.execute("""
@@ -1036,15 +1074,31 @@ async def report_cashflow():
                         )
 
         # Scenarios calculation
-        last_pt = forecast_list[-1] if forecast_list else {"p10": current_reserves, "p50": current_reserves, "p90": current_reserves}
+        last_pt = (
+            forecast_list[-1]
+            if forecast_list
+            else {"p10": current_reserves, "p50": current_reserves, "p90": current_reserves}
+        )
         p10_end = last_pt.get("p10", current_reserves)
         p50_end = last_pt.get("p50", current_reserves)
         p90_end = last_pt.get("p90", current_reserves)
         start_c = float(fc_meta[3] if fc_meta and fc_meta[3] is not None else current_reserves)
 
-        p10_runway = int(fc_meta[0]) if fc_meta and fc_meta[0] is not None else (365 if p10_end >= start_c else 180)
-        p50_runway = int(fc_meta[1]) if fc_meta and fc_meta[1] is not None else (365 if p50_end >= start_c else 240)
-        p90_runway = int(fc_meta[2]) if fc_meta and fc_meta[2] is not None else (365 if p90_end >= start_c else 365)
+        p10_runway = (
+            int(fc_meta[0])
+            if fc_meta and fc_meta[0] is not None
+            else (365 if p10_end >= start_c else 180)
+        )
+        p50_runway = (
+            int(fc_meta[1])
+            if fc_meta and fc_meta[1] is not None
+            else (365 if p50_end >= start_c else 240)
+        )
+        p90_runway = (
+            int(fc_meta[2])
+            if fc_meta and fc_meta[2] is not None
+            else (365 if p90_end >= start_c else 365)
+        )
 
         scenarios = {
             "worst_case": {
@@ -1130,12 +1184,12 @@ async def report_revenue():
             total_opex = sum(r[1] for r in exp_dept_rows) or 1.0
 
             dept_labels = {
-                'engineering': 'Engineering & R&D',
-                'sales': 'Sales & Account Exec',
-                'g&a': 'General & Administrative',
-                'marketing': 'Growth & Marketing',
-                'operations': 'Operations & Infrastructure',
-                'support': 'Customer Support & Success',
+                "engineering": "Engineering & R&D",
+                "sales": "Sales & Account Exec",
+                "g&a": "General & Administrative",
+                "marketing": "Growth & Marketing",
+                "operations": "Operations & Infrastructure",
+                "support": "Customer Support & Success",
             }
 
             expenses_by_department = [
@@ -1165,10 +1219,10 @@ async def report_revenue():
             total_tier_rev = sum(r[2] for r in tier_rows) or 1.0
 
             tier_labels = {
-                'enterprise': 'Enterprise Tier',
-                'pro': 'Professional Plan',
-                'starter': 'Starter Tier',
-                'free': 'Self-Serve & Free',
+                "enterprise": "Enterprise Tier",
+                "pro": "Professional Plan",
+                "starter": "Starter Tier",
+                "free": "Self-Serve & Free",
             }
 
             revenue_by_customer_tier = [
@@ -1233,14 +1287,16 @@ async def report_revenue():
                 opex = round(g_rev * 0.38, 2)
                 op_income = round(n_rev - opex, 2)
                 op_margin = round((op_income / g_rev * 100), 1) if g_rev else 0.0
-                perf_trends.append({
-                    "month": mo_str,
-                    "gross_revenue": g_rev,
-                    "cogs": cogs,
-                    "operating_expenses": opex,
-                    "operating_income": op_income,
-                    "operating_margin_pct": op_margin,
-                })
+                perf_trends.append(
+                    {
+                        "month": mo_str,
+                        "gross_revenue": g_rev,
+                        "cogs": cogs,
+                        "operating_expenses": opex,
+                        "operating_income": op_income,
+                        "operating_margin_pct": op_margin,
+                    }
+                )
 
             # Calculate MoM Growth
             mom_growth = 0.0
@@ -1252,7 +1308,9 @@ async def report_revenue():
             # 6. Operating and Net Profit Margins
             total_cogs = round(total_gross - total_net, 2)
             operating_income = round(total_net - (total_gross * 0.38), 2)
-            operating_margin_pct = round((operating_income / total_gross * 100), 1) if total_gross else 0.0
+            operating_margin_pct = (
+                round((operating_income / total_gross * 100), 1) if total_gross else 0.0
+            )
             net_profit_ttm = round(operating_income * 0.85, 2)  # after tax/interest provision
             net_margin_pct = round((net_profit_ttm / total_gross * 100), 1) if total_gross else 0.0
 
@@ -1288,7 +1346,14 @@ async def report_revenue():
                 {
                     "line_item": "Engineering & R&D",
                     "category": "Operating Expenses",
-                    "actual_usd": next((x["amount_usd"] for x in expenses_by_department if x["key"] == "engineering"), 2793647.06),
+                    "actual_usd": next(
+                        (
+                            x["amount_usd"]
+                            for x in expenses_by_department
+                            if x["key"] == "engineering"
+                        ),
+                        2793647.06,
+                    ),
                     "budget_usd": 2650000.0,
                     "variance_usd": 143647.06,
                     "variance_pct": 5.4,
@@ -1297,7 +1362,10 @@ async def report_revenue():
                 {
                     "line_item": "Sales & Account Executive",
                     "category": "Operating Expenses",
-                    "actual_usd": next((x["amount_usd"] for x in expenses_by_department if x["key"] == "sales"), 1193882.87),
+                    "actual_usd": next(
+                        (x["amount_usd"] for x in expenses_by_department if x["key"] == "sales"),
+                        1193882.87,
+                    ),
                     "budget_usd": 1250000.0,
                     "variance_usd": -56117.13,
                     "variance_pct": -4.5,
@@ -1306,7 +1374,10 @@ async def report_revenue():
                 {
                     "line_item": "General & Administrative",
                     "category": "Operating Expenses",
-                    "actual_usd": next((x["amount_usd"] for x in expenses_by_department if x["key"] == "g&a"), 977441.05),
+                    "actual_usd": next(
+                        (x["amount_usd"] for x in expenses_by_department if x["key"] == "g&a"),
+                        977441.05,
+                    ),
                     "budget_usd": 950000.0,
                     "variance_usd": 27441.05,
                     "variance_pct": 2.9,
@@ -1315,7 +1386,14 @@ async def report_revenue():
                 {
                     "line_item": "Growth & Marketing",
                     "category": "Operating Expenses",
-                    "actual_usd": next((x["amount_usd"] for x in expenses_by_department if x["key"] == "marketing"), 956949.04),
+                    "actual_usd": next(
+                        (
+                            x["amount_usd"]
+                            for x in expenses_by_department
+                            if x["key"] == "marketing"
+                        ),
+                        956949.04,
+                    ),
                     "budget_usd": 1020000.0,
                     "variance_usd": -63050.96,
                     "variance_pct": -6.2,
@@ -1327,9 +1405,13 @@ async def report_revenue():
             avg_quarter_rev = round(total_gross / 4.0, 2)
             forecasting = {
                 "q1_projected_revenue": round(avg_quarter_rev * 1.08, 2),
-                "q1_projected_income": round((avg_quarter_rev * 1.08) * (operating_margin_pct / 100.0), 2),
+                "q1_projected_income": round(
+                    (avg_quarter_rev * 1.08) * (operating_margin_pct / 100.0), 2
+                ),
                 "q2_projected_revenue": round(avg_quarter_rev * 1.16, 2),
-                "q2_projected_income": round((avg_quarter_rev * 1.16) * (operating_margin_pct / 100.0), 2),
+                "q2_projected_income": round(
+                    (avg_quarter_rev * 1.16) * (operating_margin_pct / 100.0), 2
+                ),
                 "target_operating_margin_pct": 62.5,
                 "projected_cagr_pct": 14.2,
                 "confidence_interval": "95% Bayesian Posterior",
@@ -1465,12 +1547,12 @@ async def report_ops():
             """).fetchall()
 
             source_labels = {
-                'stripe': 'Stripe Connect',
-                'plaid': 'Plaid Instant ACH',
-                'ach': 'Federal Reserve ACH',
-                'adyen': 'Adyen Global Rail',
-                'manual_journal': 'Internal Clearing',
-                'wire': 'Fedwire RTGS',
+                "stripe": "Stripe Connect",
+                "plaid": "Plaid Instant ACH",
+                "ach": "Federal Reserve ACH",
+                "adyen": "Adyen Global Rail",
+                "manual_journal": "Internal Clearing",
+                "wire": "Fedwire RTGS",
             }
 
             gateways = [
@@ -1480,7 +1562,7 @@ async def report_ops():
                     "total_transactions": int(r[1]),
                     "success_rate": float(r[2]),
                     "volume_usd": float(r[3]),
-                    "avg_latency_ms": 142 if r[0] == 'stripe' else 85 if r[0] == 'plaid' else 115,
+                    "avg_latency_ms": 142 if r[0] == "stripe" else 85 if r[0] == "plaid" else 115,
                     "health_status": "Optimal" if r[2] >= 93 else "Degraded",
                 }
                 for r in gateway_rows
@@ -1513,7 +1595,11 @@ async def report_ops():
             disp_lost = int(disp_counts[1] or 0)
             disp_active = int(disp_counts[2] or 0)
             total_dispute_amount_usd = float(disp_counts[3] or 0.0)
-            disp_win_rate = round((disp_won / (disp_won + disp_lost) * 100), 1) if (disp_won + disp_lost) else 53.7
+            disp_win_rate = (
+                round((disp_won / (disp_won + disp_lost) * 100), 1)
+                if (disp_won + disp_lost)
+                else 53.7
+            )
 
             # 4. Automation & ML Recovery Performance
             retry_summary = conn.execute("""
@@ -1762,7 +1848,9 @@ async def report_ar_aging():
                 "critical_90_plus_usd": ar_90_plus,
                 "critical_90_plus_pct": critical_90_plus_pct,
                 "bad_debt_provision_usd": total_bad_debt_provision,
-                "provision_rate_pct": round((total_bad_debt_provision / total_ar * 100) if total_ar else 0, 1),
+                "provision_rate_pct": round(
+                    (total_bad_debt_provision / total_ar * 100) if total_ar else 0, 1
+                ),
             }
 
             buckets = [
@@ -1873,23 +1961,25 @@ async def report_ar_aging():
                     raction = "Send Urgent Statement with 5% Pay Discount"
                     rtier = "Elevated"
 
-                high_risk_accounts.append({
-                    "customer_id": cid,
-                    "customer_name": hr[1] or cid,
-                    "customer_email": hr[2] or f"billing@{cid}.com",
-                    "plan": (hr[3] or "standard").upper(),
-                    "country": hr[4] or "US",
-                    "invoices": int(hr[5] or 1),
-                    "total": round(float(hr[6] or 0), 2),
-                    "current": round(float(hr[7] or 0), 2),
-                    "days_31_60": round(float(hr[8] or 0), 2),
-                    "days_61_90": round(float(hr[9] or 0), 2),
-                    "days_90_plus": amt_90,
-                    "risk_tier": rtier,
-                    "dunning_stage": dstage,
-                    "recommended_action": raction,
-                    "days_overdue_estimate": 94 + (abs(hash(cid)) % 25),
-                })
+                high_risk_accounts.append(
+                    {
+                        "customer_id": cid,
+                        "customer_name": hr[1] or cid,
+                        "customer_email": hr[2] or f"billing@{cid}.com",
+                        "plan": (hr[3] or "standard").upper(),
+                        "country": hr[4] or "US",
+                        "invoices": int(hr[5] or 1),
+                        "total": round(float(hr[6] or 0), 2),
+                        "current": round(float(hr[7] or 0), 2),
+                        "days_31_60": round(float(hr[8] or 0), 2),
+                        "days_61_90": round(float(hr[9] or 0), 2),
+                        "days_90_plus": amt_90,
+                        "risk_tier": rtier,
+                        "dunning_stage": dstage,
+                        "recommended_action": raction,
+                        "days_overdue_estimate": 94 + (abs(hash(cid)) % 25),
+                    }
+                )
 
             # Full Customer Aging List (200 accounts)
             aging_query = conn.execute("""
@@ -1938,27 +2028,33 @@ async def report_ar_aging():
                     raction = "Standard Invoice Delivery"
 
                 plan_val = r[3] or "standard"
-                credit_limit = 5000.0 if plan_val == "enterprise" else (2500.0 if plan_val == "pro" else 1000.0)
+                credit_limit = (
+                    5000.0
+                    if plan_val == "enterprise"
+                    else (2500.0 if plan_val == "pro" else 1000.0)
+                )
                 utilization = round(min(100.0, (tot / credit_limit) * 100), 1)
 
-                aging_list.append({
-                    "customer_id": cid,
-                    "customer_name": r[1] or cid,
-                    "customer_email": r[2] or f"billing@{cid}.com",
-                    "plan": plan_val.upper(),
-                    "country": r[4] or "US",
-                    "invoices": int(r[5] or 1),
-                    "total": tot,
-                    "current": cur,
-                    "days_31_60": p30,
-                    "days_61_90": p60,
-                    "days_90_plus": p90,
-                    "severity": sev,
-                    "credit_limit": credit_limit,
-                    "credit_utilization": utilization,
-                    "dunning_stage": dstage,
-                    "recommended_action": raction,
-                })
+                aging_list.append(
+                    {
+                        "customer_id": cid,
+                        "customer_name": r[1] or cid,
+                        "customer_email": r[2] or f"billing@{cid}.com",
+                        "plan": plan_val.upper(),
+                        "country": r[4] or "US",
+                        "invoices": int(r[5] or 1),
+                        "total": tot,
+                        "current": cur,
+                        "days_31_60": p30,
+                        "days_61_90": p60,
+                        "days_90_plus": p90,
+                        "severity": sev,
+                        "credit_limit": credit_limit,
+                        "credit_utilization": utilization,
+                        "dunning_stage": dstage,
+                        "recommended_action": raction,
+                    }
+                )
 
             return {
                 "summary": summary,

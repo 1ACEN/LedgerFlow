@@ -225,6 +225,21 @@ MIGRATIONS = [
     """,
     ),
     (
+        "004",
+        "Add indexes",
+        """
+        CREATE INDEX IF NOT EXISTS idx_transactions_occurred_date ON transactions(occurred_date);
+        CREATE INDEX IF NOT EXISTS idx_transactions_posted_date ON transactions(posted_date);
+        CREATE INDEX IF NOT EXISTS idx_transactions_customer ON transactions(customer_id);
+        CREATE INDEX IF NOT EXISTS idx_transactions_type_status ON transactions(type, status);
+        CREATE INDEX IF NOT EXISTS idx_transactions_source ON transactions(source);
+        CREATE INDEX IF NOT EXISTS idx_transactions_dispute ON transactions(dispute_id);
+        CREATE INDEX IF NOT EXISTS idx_cash_forecast_date ON ml.cash_flow_forecast(forecast_date);
+        CREATE INDEX IF NOT EXISTS idx_decline_pred_customer ON ml.decline_predictions(customer_id);
+        CREATE INDEX IF NOT EXISTS idx_transactions_idempotency ON transactions(idempotency_key);
+    """,
+    ),
+    (
         "005",
         "Add forecasts alias view",
         """
@@ -265,22 +280,7 @@ MIGRATIONS = [
     """,
     ),
     (
-        "004",
-        "Add indexes",
-        """
-        CREATE INDEX IF NOT EXISTS idx_transactions_occurred_date ON transactions(occurred_date);
-        CREATE INDEX IF NOT EXISTS idx_transactions_posted_date ON transactions(posted_date);
-        CREATE INDEX IF NOT EXISTS idx_transactions_customer ON transactions(customer_id);
-        CREATE INDEX IF NOT EXISTS idx_transactions_type_status ON transactions(type, status);
-        CREATE INDEX IF NOT EXISTS idx_transactions_source ON transactions(source);
-        CREATE INDEX IF NOT EXISTS idx_transactions_dispute ON transactions(dispute_id);
-        CREATE INDEX IF NOT EXISTS idx_cash_forecast_date ON ml.cash_flow_forecast(forecast_date);
-        CREATE INDEX IF NOT EXISTS idx_decline_pred_customer ON ml.decline_predictions(customer_id);
-        CREATE INDEX IF NOT EXISTS idx_transactions_idempotency ON transactions(idempotency_key);
-    """,
-    ),
-    (
-        "005",
+        "007",
         "Align signed accounting in monthly_pl view",
         """
         CREATE OR REPLACE VIEW analytics.monthly_pl AS

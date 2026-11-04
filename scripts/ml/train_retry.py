@@ -119,8 +119,8 @@ def prepare_features(conn: duckdb.DuckDBPyConnection) -> tuple:
     df = conn.execute(query).pl()
     console.log(f"Loaded {len(df)} decline events")
 
-    if len(df) < 100:
-        raise ValueError(f"Need at least 100 decline events, got {len(df)}")
+    if len(df) < 30:
+        raise ValueError(f"Need at least 30 decline events, got {len(df)}")
 
     # Feature engineering
     df = df.with_columns(

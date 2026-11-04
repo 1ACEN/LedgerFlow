@@ -200,8 +200,9 @@ def write_predictions(df: pl.DataFrame, db_path: Path) -> int:
             feature_set_version = EXCLUDED.feature_set_version
     """)
 
+    forecast_date = df["forecast_date"][0]
     count = conn.execute(
-        "SELECT COUNT(*) FROM ml.cash_flow_forecast WHERE forecast_date = CURRENT_DATE"
+        "SELECT COUNT(*) FROM ml.cash_flow_forecast WHERE forecast_date = ?", [forecast_date]
     ).fetchone()[0]
     conn.close()
 
