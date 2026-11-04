@@ -72,5 +72,74 @@ describe('useCashflow logic', () => {
       expect(k.historical12wNet).toBe(20000);
       expect(k.avgWeeklyNet).toBe(5000);
     });
+
+    it('computes enriched Analytical Data Intelligence metrics, breakdowns, and scenarios', () => {
+      const mockResponse = {
+        current_cash_reserves: 7200000,
+        net_cash_flow_30d: 115000,
+        inflows_30d: 550000,
+        outflows_30d: 435000,
+        operating_cash_flow_30d: 520000,
+        free_cash_flow_30d: 260000,
+        inflows_breakdown: [
+          { category: 'Subscriptions', amount: 220000, percentage: 40.0 },
+          { category: 'Platform Fees', amount: 330000, percentage: 60.0 },
+        ],
+        outflows_breakdown: [
+          { category: 'Vendor Payouts', amount: 250000, percentage: 57.5 },
+          { category: 'Processing Fees', amount: 185000, percentage: 42.5 },
+        ],
+        monthly_trends: [
+          { period: '2026-10', inflows: 250000, outflows: 140000, net_flow: 110000, ending_cash: 7300000 },
+        ],
+        quarterly_trends: [
+          { period: '2026-Q4', inflows: 540000, outflows: 520000, net_flow: 20000, ending_cash: 7200000 },
+        ],
+        actual_history_30d: [
+          { date: '2026-10-01', inflows: 10000, outflows: 8000, net: 2000, cash: 7200000 },
+        ],
+        scenarios: {
+          worst_case: {
+            label: 'Worst-Case (P10)',
+            description: 'Stress test',
+            runway_days: 180,
+            ending_cash_90d: 1450000,
+            net_change_90d: 80000,
+            daily_burn_or_growth: 888,
+          },
+          base_case: {
+            label: 'Base-Case (P50)',
+            description: 'Expected median',
+            runway_days: 365,
+            ending_cash_90d: 1580000,
+            net_change_90d: 210000,
+            daily_burn_or_growth: 2333,
+          },
+          best_case: {
+            label: 'Best-Case (P90)',
+            description: 'Optimistic growth',
+            runway_days: 365,
+            ending_cash_90d: 1650000,
+            net_change_90d: 280000,
+            daily_burn_or_growth: 3111,
+          },
+        },
+      };
+
+      const k = computeCashflowKpis(sampleForecast, sampleWeekly, mockResponse);
+      expect(k.currentReserves).toBe(7200000);
+      expect(k.netCashFlow30d).toBe(115000);
+      expect(k.operatingCashFlow30d).toBe(520000);
+      expect(k.freeCashFlow30d).toBe(260000);
+      expect(k.inflowsBreakdown).toHaveLength(2);
+      expect(k.outflowsBreakdown).toHaveLength(2);
+      expect(k.monthlyTrends).toHaveLength(1);
+      expect(k.quarterlyTrends).toHaveLength(1);
+      expect(k.actualHistory30d).toHaveLength(1);
+      expect(k.scenarios.worst_case.runway_days).toBe(180);
+      expect(k.p10RunwayDays).toBe(180);
+      expect(k.p50RunwayDays).toBe(365);
+      expect(k.p90RunwayDays).toBe(365);
+    });
   });
 });

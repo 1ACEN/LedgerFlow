@@ -14,6 +14,14 @@ describe('computeExecutiveKpis', () => {
     expect(kpis.totalInflows30d).toBe(0);
     expect(kpis.totalOutflows30d).toBe(0);
     expect(kpis.runwayStatus).toBe('critical');
+    expect(kpis.totalRevenue30d).toBe(0);
+    expect(kpis.totalExpenses30d).toBe(0);
+    expect(kpis.netProfit30d).toBe(0);
+    expect(kpis.grossMarginPct).toBe(0);
+    expect(kpis.netMarginPct).toBe(0);
+    expect(kpis.revenueGrowthMoM).toBe(0);
+    expect(kpis.monthlyComparison).toEqual([]);
+    expect(kpis.alerts).toEqual([]);
   });
 
   it('computes executive KPIs accurately from response payload', () => {
@@ -82,5 +90,53 @@ describe('computeExecutiveKpis', () => {
 
     const kpis = computeExecutiveKpis(mockData);
     expect(kpis.net30dChange).toBe(25000);
+  });
+
+  it('computes enriched Command Center executive KPIs with margins, monthly comparisons, and risks', () => {
+    const mockData: ExecutiveReportResponse = {
+      current_cash: 18500000,
+      runway_p50: 365,
+      success_rate_24h: 99.8,
+      net_burn_30d: 8400,
+      total_transactions: 124500,
+      last_ingested: '2026-10-31T23:59:00Z',
+      cash_trend: [],
+      total_revenue_30d: 4500000,
+      total_expenses_30d: 1200000,
+      net_profit_30d: 3300000,
+      gross_margin_pct: 98.5,
+      net_margin_pct: 73.3,
+      revenue_growth_mom: 14.8,
+      monthly_comparison: [
+        { month: '2026-05', revenue: 3800000, expenses: 1100000, net_profit: 2700000, margin_pct: 71.1 },
+        { month: '2026-06', revenue: 4500000, expenses: 1200000, net_profit: 3300000, margin_pct: 73.3 },
+      ],
+      ar_risk: {
+        total_outstanding_usd: 850000,
+        overdue_90plus_usd: 42000,
+        overdue_90plus_pct: 4.9,
+      },
+      disputes_risk: {
+        count: 3,
+        amount_usd: 1250,
+      },
+      alerts: [
+        { id: 'runway_optimal', type: 'positive', title: 'Capital Runway Exceeds 1 Year', message: 'Current cash gives 365 days of runway.' },
+      ],
+    };
+
+    const kpis = computeExecutiveKpis(mockData);
+    expect(kpis.totalRevenue30d).toBe(4500000);
+    expect(kpis.totalExpenses30d).toBe(1200000);
+    expect(kpis.netProfit30d).toBe(3300000);
+    expect(kpis.grossMarginPct).toBe(98.5);
+    expect(kpis.netMarginPct).toBe(73.3);
+    expect(kpis.revenueGrowthMoM).toBe(14.8);
+    expect(kpis.monthlyComparison).toHaveLength(2);
+    expect(kpis.monthlyComparison[1].month).toBe('2026-06');
+    expect(kpis.arRisk.overdue_90plus_pct).toBe(4.9);
+    expect(kpis.disputesRisk.count).toBe(3);
+    expect(kpis.alerts).toHaveLength(1);
+    expect(kpis.alerts[0].type).toBe('positive');
   });
 });

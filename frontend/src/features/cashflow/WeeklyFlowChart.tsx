@@ -77,13 +77,19 @@ export default function WeeklyFlowChart({ weekly }: Props) {
   }, [weekly, hasData]);
 
   return (
-    <div className="card animate-in stagger-3">
+    <div className="card animate-in stagger-3" style={{ height: '100%' }}>
       <div className="card-header">
-        <span className="card-title">Weekly Net Cash Flow Trends</span>
-        <span className="card-subtitle">operating net cash per week</span>
+        <div>
+          <span className="card-title">Weekly Net Cash Flow Distribution</span>
+          <span className="card-subtitle" style={{ display: 'block' }}>
+            Operating net flow surplus &amp; deficit deltas across rolling 12 weeks
+          </span>
+        </div>
       </div>
       <div className="card-body">
-        <ChartBox config={config} />
+        <div className="chart-box" style={{ height: 320 }}>
+          <ChartBox config={config} />
+        </div>
       </div>
     </div>
   );

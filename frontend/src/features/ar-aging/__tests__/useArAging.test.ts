@@ -133,3 +133,19 @@ describe('arKpis', () => {
     expect(k.overduePct).toBe(0);
   });
 });
+
+// ── Enriched Collections & Risk Model ────────────────────────────────
+
+describe('AR Aging Collections & Risk Model', () => {
+  it('validates aging bucket distribution integrity', () => {
+    const rows = [
+      row({ customer_id: '1', current: 1000, days_31_60: 500, days_61_90: 250, days_90_plus: 100, total: 1850 }),
+      row({ customer_id: '2', current: 2000, days_31_60: 0, days_61_90: 0, days_90_plus: 0, total: 2000 }),
+    ];
+    const k = arKpis(rows);
+    expect(k.total).toBe(3850);
+    expect(k.customers).toBe(2);
+    expect(topOverdue(rows)).toHaveLength(1);
+    expect(topOverdue(rows)[0].customer_id).toBe('1');
+  });
+});

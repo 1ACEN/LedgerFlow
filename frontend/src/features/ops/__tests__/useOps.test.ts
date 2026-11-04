@@ -99,6 +99,99 @@ describe('computeOpsKpis', () => {
     expect(kpis.totalDisputeAmount).toBe(475.5);
   });
 
+  it('computes enriched Modern AI Operations Console metrics accurately', () => {
+    const mockData: OpsReportResponse = {
+      declines: [],
+      success_trend: [],
+      retry_advisor: [],
+      disputes: [],
+      transaction_monitoring: {
+        total_transactions: 52721,
+        total_volume_usd: 29761711,
+        succeeded_count: 49442,
+        failed_count: 2100,
+        pending_count: 789,
+        disputed_count: 322,
+        overall_success_rate: 93.8,
+        throughput_tps: 42.8,
+      },
+      ai_anomaly_detection: {
+        system_health_score: 98.4,
+        anomaly_status: 'Optimal Operational Health',
+        active_anomalies_count: 3,
+        anomalies_flagged: [
+          {
+            id: 'anom_01',
+            title: 'High-Frequency Velocity Anomaly',
+            type: 'Velocity Variance',
+            severity: 'medium',
+            affected_rail: 'Adyen Global Rail',
+            description: '14 micro-charges flagged',
+            detected_at: '12m ago',
+            confidence: 94.2,
+            status: 'Contained',
+          },
+        ],
+      },
+      payment_processing_metrics: {
+        gateways: [
+          {
+            source: 'stripe',
+            name: 'Stripe Connect',
+            total_transactions: 26604,
+            success_rate: 93.6,
+            volume_usd: 15173571,
+            avg_latency_ms: 142,
+            health_status: 'Optimal',
+          },
+        ],
+        avg_gateway_latency_ms: 114,
+      },
+      fraud_risk_indicators: {
+        normal_count: 51024,
+        elevated_risk_count: 1031,
+        highest_risk_count: 666,
+        dispute_rate_bps: 65.1,
+        chargeback_threshold_status: 'Optimal',
+        disputes_won_count: 80,
+        disputes_lost_count: 69,
+        active_disputes_count: 173,
+        win_rate_pct: 53.7,
+        total_dispute_amount_usd: 210444,
+      },
+      automation_performance: {
+        smart_retry_recovery_usd: 14174.8,
+        high_confidence_retries_count: 5,
+        avg_retry_probability_pct: 50.6,
+        automated_recovery_rate_pct: 81.4,
+        manual_intervention_reduction_pct: 94.2,
+        workflow_resolution_rate_pct: 98.6,
+      },
+      ai_insights: [
+        {
+          id: 'ins_01',
+          priority: 'high',
+          category: 'Smart Routing',
+          title: 'Dynamic Rail Optimization',
+          observation: 'Plaid Instant ACH shows 94% auth rate',
+          recommendation: 'Route high value B2B invoices to Plaid',
+          impact: '$48,200 annual interchange fee savings',
+        },
+      ],
+    };
+
+    const kpis = computeOpsKpis(mockData);
+    expect(kpis.totalTransactions).toBe(52721);
+    expect(kpis.avgSuccessRate).toBe(93.8);
+    expect(kpis.systemHealthScore).toBe(98.4);
+    expect(kpis.anomaliesFlagged).toHaveLength(1);
+    expect(kpis.gateways).toHaveLength(1);
+    expect(kpis.disputeRateBps).toBe(65.1);
+    expect(kpis.disputeWinRatePct).toBe(53.7);
+    expect(kpis.automatedRecoveryRatePct).toBe(81.4);
+    expect(kpis.aiInsights).toHaveLength(1);
+  });
+
   it('handles empty arrays without division by zero errors', () => {
     const emptyData: OpsReportResponse = {
       declines: [],

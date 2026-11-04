@@ -1,86 +1,287 @@
-import { useEffect, useState } from 'react';
-import { fetchArAging, type ArAgingRow } from './useArAging';
+import { useState } from 'react';
+import { useArAging } from './useArAging';
 import ArKpiStrip from './ArKpiStrip';
+import AgingBucketAnalysisCard from './AgingBucketAnalysisCard';
+import CollectionEfficiencyCard from './CollectionEfficiencyCard';
+import HighRiskAccountsCard from './HighRiskAccountsCard';
 import ArBucketChart from './ArBucketChart';
-import OverdueSpotlight from './OverdueSpotlight';
 import ArAgingTable from './ArAgingTable';
 
 interface Props {
   refreshKey?: number;
 }
 
-export default function ArAgingTab({ refreshKey }: Props) {
-  const [aging, setAging] = useState<ArAgingRow[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [reloadCount, setReloadCount] = useState(0);
+type TabFocus = 'all' | 'buckets' | 'efficiency' | 'high_risk' | 'ledger';
 
-  useEffect(() => {
-    let cancelled = false;
-    setError(null);
-    fetchArAging()
-      .then((data) => {
-        if (!cancelled) setAging(data.aging);
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [reloadCount, refreshKey]);
+export default function ArAgingTab({ refreshKey }: Props) {
+  const { data, kpis, buckets, efficiency, highRisk, aging, loading, error, refetch } = useArAging(refreshKey);
+  const [activeFocus, setActiveFocus] = useState<TabFocus>('all');
 
   if (error) {
     return (
-      <div className="card animate-in">
-        <div className="card-body">
-          <div className="empty-state">
-            <div className="empty-state-title">Failed to load AR aging</div>
-            <div className="empty-state-desc">{error}</div>
-            <button
-              className="tab-btn active"
-              onClick={() => setReloadCount((c) => c + 1)}
-              style={{ width: 'fit-content', marginTop: '12px' }}
-            >
-              Try Again
-            </button>
-          </div>
+      <div className="card animate-in" style={{ padding: 32, textAlign: 'center', borderColor: 'var(--red)', maxWidth: 600, margin: '40px auto' }}>
+        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--red)', marginBottom: 8 }}>
+          Failed to load Accounts Receivable &amp; Risk Intelligence
         </div>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>
+          {error}
+        </div>
+        <button
+          className="refresh-btn"
+          onClick={refetch}
+          style={{ display: 'inline-flex', margin: '0 auto', gap: 8, alignItems: 'center' }}
+        >
+          <span>↻</span>
+          <span>Retry Connection</span>
+        </button>
       </div>
     );
   }
 
-  if (!aging) {
+  if (loading && !data) {
     return (
-      <div className="card animate-in">
-        <div className="card-header">
-          <span className="card-title">Accounts Receivable Aging Report</span>
+      <div className="card animate-in" style={{ padding: 24 }}>
+        <div className="skeleton" style={{ height: 28, width: 280, marginBottom: 16 }} />
+        <div className="skeleton" style={{ height: 100, marginBottom: 20 }} />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>
+          <div className="skeleton" style={{ height: 120 }} />
+          <div className="skeleton" style={{ height: 120 }} />
+          <div className="skeleton" style={{ height: 120 }} />
+          <div className="skeleton" style={{ height: 120 }} />
         </div>
-        <div className="card-body">
-          <div className="skeleton" style={{ height: '44px', marginBottom: '16px' }}></div>
-          <div className="skeleton" style={{ height: '280px' }}></div>
-        </div>
+        <div className="skeleton" style={{ height: 320 }} />
       </div>
     );
   }
 
   return (
-    <>
-      <ArKpiStrip aging={aging} />
-
-      <div className="grid-2">
-        <ArBucketChart aging={aging} />
-        <OverdueSpotlight aging={aging} />
-      </div>
-
-      <div className="card animate-in" style={{ marginTop: '16px' }}>
-        <div className="card-header">
-          <span className="card-title">Accounts Receivable Aging Report</span>
-          <span className="card-subtitle">
-            Accrual Basis Outstanding Invoices · rows colored by severity
-          </span>
+    <div
+      className="ar-aging-tab-container"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 20,
+        maxWidth: 1560,
+        margin: '0 auto',
+      }}
+    >
+      {/* Header with Navigation Pills & Refresh Control */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          flexWrap: 'wrap',
+          gap: 16,
+          paddingBottom: 4,
+        }}
+      >
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <span
+              style={{
+                fontSize: 10.5,
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.8px',
+                color: '#f59e0b',
+                padding: '2px 8px',
+                background: 'rgba(245, 158, 11, 0.12)',
+                borderRadius: 'var(--radius-xs)',
+                border: '1px solid rgba(245, 158, 11, 0.25)',
+              }}
+            >
+              Collections &amp; Risk Management Dashboard
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+              · Accrual Basis Ledger · Delinquency Surveillance
+            </span>
+          </div>
+          <h1
+            style={{
+              fontSize: 22,
+              fontWeight: 800,
+              color: 'var(--text-primary)',
+              letterSpacing: '-0.4px',
+              margin: 0,
+            }}
+          >
+            Accounts Receivable &amp; Credit Risk
+          </h1>
+          <p
+            style={{
+              fontSize: 12.5,
+              color: 'var(--text-secondary)',
+              margin: '3px 0 0 0',
+            }}
+          >
+            Aging bucket stratification, DSO turnover velocity, bad debt provisioning, and high-risk dunning queue
+          </p>
         </div>
-        <ArAgingTable aging={aging} />
+
+        {/* View Focus Pills & Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div
+            style={{
+              display: 'flex',
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: 8,
+              padding: 2,
+            }}
+          >
+            <button
+              onClick={() => setActiveFocus('all')}
+              style={{
+                background: activeFocus === 'all' ? 'rgba(255, 255, 255, 0.12)' : 'transparent',
+                color: activeFocus === 'all' ? '#fff' : 'var(--text-secondary)',
+                border: 'none',
+                padding: '6px 12px',
+                borderRadius: 6,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              All Operations
+            </button>
+            <button
+              onClick={() => setActiveFocus('buckets')}
+              style={{
+                background: activeFocus === 'buckets' ? 'rgba(255, 255, 255, 0.12)' : 'transparent',
+                color: activeFocus === 'buckets' ? '#fff' : 'var(--text-secondary)',
+                border: 'none',
+                padding: '6px 12px',
+                borderRadius: 6,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Aging Buckets
+            </button>
+            <button
+              onClick={() => setActiveFocus('efficiency')}
+              style={{
+                background: activeFocus === 'efficiency' ? 'rgba(255, 255, 255, 0.12)' : 'transparent',
+                color: activeFocus === 'efficiency' ? '#fff' : 'var(--text-secondary)',
+                border: 'none',
+                padding: '6px 12px',
+                borderRadius: 6,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Turnover &amp; DSO
+            </button>
+            <button
+              onClick={() => setActiveFocus('high_risk')}
+              style={{
+                background: activeFocus === 'high_risk' ? 'rgba(244, 63, 94, 0.2)' : 'transparent',
+                color: activeFocus === 'high_risk' ? '#fb7185' : 'var(--text-secondary)',
+                border: 'none',
+                padding: '6px 12px',
+                borderRadius: 6,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              High Risk ({highRisk.length})
+            </button>
+            <button
+              onClick={() => setActiveFocus('ledger')}
+              style={{
+                background: activeFocus === 'ledger' ? 'rgba(255, 255, 255, 0.12)' : 'transparent',
+                color: activeFocus === 'ledger' ? '#fff' : 'var(--text-secondary)',
+                border: 'none',
+                padding: '6px 12px',
+                borderRadius: 6,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Customer Ledger
+            </button>
+          </div>
+
+          <button
+            className="refresh-btn"
+            onClick={refetch}
+            title="Re-query Accounts Receivable Ledger"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 12px', fontSize: 12 }}
+          >
+            <span>↻</span>
+            <span>Refresh</span>
+          </button>
+        </div>
       </div>
-    </>
+
+      {/* 5-Card Command Strip */}
+      {kpis && <ArKpiStrip summary={kpis} efficiency={efficiency} aging={aging} />}
+
+      {/* View Section 1: Aging Buckets & Risk Stratification */}
+      {(activeFocus === 'all' || activeFocus === 'buckets') && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.8fr) minmax(0, 1.2fr)', gap: 16 }}>
+          <AgingBucketAnalysisCard buckets={buckets} totalOutstanding={kpis?.total_outstanding_usd || 0} />
+          <ArBucketChart aging={aging} />
+        </div>
+      )}
+
+      {/* View Section 2: Collection Efficiency & High-Risk Queue */}
+      {(activeFocus === 'all' || activeFocus === 'efficiency' || activeFocus === 'high_risk') && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 16 }}>
+          {(activeFocus === 'all' || activeFocus === 'efficiency') && (
+            <CollectionEfficiencyCard efficiency={efficiency} />
+          )}
+          {(activeFocus === 'all' || activeFocus === 'high_risk') && (
+            <HighRiskAccountsCard accounts={highRisk} />
+          )}
+        </div>
+      )}
+
+      {/* View Section 3: Customer-Wise Outstanding Ledger */}
+      {(activeFocus === 'all' || activeFocus === 'ledger') && (
+        <div className="card animate-in" style={{ padding: 0 }}>
+          <div
+            style={{
+              padding: '16px 20px',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 12,
+            }}
+          >
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
+                  Customer-Wise Outstanding Ledger
+                </span>
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    padding: '2px 6px',
+                    borderRadius: 4,
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    color: 'var(--text-secondary)',
+                  }}
+                >
+                  {aging.length} Accounts Loaded
+                </span>
+              </div>
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--text-secondary)' }}>
+                Detailed account balances, aging breakdown, credit utilization, and action execution triggers
+              </p>
+            </div>
+          </div>
+          <ArAgingTable aging={aging} />
+        </div>
+      )}
+    </div>
   );
 }

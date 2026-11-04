@@ -1,0 +1,134 @@
+# LedgerFlow — DuckDB Architecture & Synthetic Seed Documentation
+
+This document describes the DuckDB data architecture, analytical schema, signed accounting conventions, and synthetic data generation assumptions for LedgerFlow.
+
+---
+
+## 1. DuckDB Storage Architecture
+
+LedgerFlow uses **DuckDB** as its embedded analytical database engine, combining ultra-fast columnar analytical queries with lightweight single-process persistence.
+
+```
+data/
+├── ledgerflow.duckdb          # Primary embedded DuckDB database file
+├── ledgerflow.duckdb.wal      # DuckDB Write-Ahead Log
+├── transactions/              # Partitioned cold storage / Parquet export
+│   └── occurred_year=YYYY/
+│       └── occurred_month=MM/
+│           └── *.parquet      # ZSTD-compressed partitioned transaction chunks
+└── seed_docs.md               # Data dictionary and generator specifications
+```
+
+### Concurrency & Locks
+- In-process concurrency is coordinated using Python's `threading.Lock` (`_db_lock` in `scripts/ingestion/common.py`).
+- DuckDB connections are opened per-thread or reused safely with WAL-backed crash safety.
+
+---
+
+## 2. Schema Structure
+
+The database is structured into three distinct namespaces:
+
+### 2.1 `main` — Core Ledger & Dimensions
+* **`transactions`**: The central append-only immutable financial ledger.
+  * `transaction_id` (`VARCHAR PRIMARY KEY`): Unique transaction identifier (e.g., `ch_...`, `plaid_...`, `manual_...`, `txn_...`).
+  * `idempotency_key` (`VARCHAR UNIQUE`): Deduplication key preventing duplicate processing across webhooks and polling.
+  * `occurred_at` / `posted_at` (`TIMESTAMPTZ`): Timezone-aware event occurrence and settlement timestamps.
+  * `occurred_date`, `posted_date`, `occurred_hour`, `occurred_dow`, `occurred_week`, `occurred_month`, `occurred_quarter`, `occurred_year`: Partitioning and temporal index keys.
+  * `type` (`VARCHAR`): Transaction classification (`charge`, `refund`, `payout`, `fee`, `transfer`, `invoice_payment`, `adjustment`).
+  * `status` (`VARCHAR`): Lifecycle state (`succeeded`, `failed`, `pending`, `disputed`, `canceled`).
+  * `source` (`VARCHAR`): Origination channel (`stripe`, `plaid`, `adyen`, `ach`, `wire`, `manual`).
+  * `amount` (`BIGINT NOT NULL`): Gross transaction amount in integer cents. Always non-negative.
+  * `currency` (`CHAR(3)`): ISO currency code (USD, EUR, GBP, CAD, AUD, JPY).
+  * `fx_rate` (`DOUBLE DEFAULT 1.0`): Exchange rate to USD at settlement.
+  * `net_amount` (`BIGINT NOT NULL`): Signed net balance impact in cents.
+  * `fee_amount` (`BIGINT NOT NULL DEFAULT 0`): Gateway/interchange fees in cents.
+  * `amount_usd` (`DOUBLE GENERATED ALWAYS AS (amount * fx_rate / 100.0)`): Gross USD equivalent.
+  * `net_amount_usd` (`DOUBLE GENERATED ALWAYS AS (net_amount * fx_rate / 100.0)`): Signed net balance impact in USD.
+  * `fee_amount_usd` (`DOUBLE GENERATED ALWAYS AS (fee_amount * fx_rate / 100.0)`): Processor fee in USD.
+  * `customer_id`, `merchant_account_id`, `product_line`, `department`, `account_code`, `cost_center`, `basis`, `decline_code`, `risk_level`, `dispute_id`, `description`, `metadata_json`.
+
+* **`customers`**: Customer dimension containing account identifiers, names, emails, plans (`free`, `starter`, `pro`, `enterprise`), and LTV.
+* **`merchants`**: Merchant legal entities and settlement accounts.
+* **`schema_migrations`**: Migration version tracking table (`version`, `description`, `applied_at`, `checksum`).
+
+---
+
+### 2.2 `analytics` — Materialized & Reporting Views
+* **`analytics.daily_cash_position`**: Aggregates daily cash-basis movements (`inflows_usd`, `outflows_usd`, `net_flow_usd`, and cumulative running balance `cumulative_cash_usd`).
+* **`analytics.monthly_pl`**: Accrual-basis monthly P&L aggregated by `account_code`. Uses signed accounting:
+  * `credit_usd = SUM(CASE WHEN net_amount_usd > 0 THEN net_amount_usd ELSE 0 END)`
+  * `debit_usd  = SUM(CASE WHEN net_amount_usd < 0 THEN -net_amount_usd ELSE 0 END)`
+  * `net_usd    = SUM(net_amount_usd)`
+* **`analytics.revenue_by_product`**: Monthly revenue, refunds, and net revenue sliced across business lines (`subscriptions`, `professional_services`, `marketplace`, `ecommerce`, `platform_fees`).
+* **`analytics.ar_aging`**: Customer-level accounts receivable aging buckets:
+  * `current_usd` (0–30 days)
+  * `days_31_60_usd` (31–60 days)
+  * `days_61_90_usd` (61–90 days)
+  * `days_90_plus_usd` (90+ days)
+* **`analytics.success_rate_daily`**: Daily payment gateway authorization rate per source.
+* **`analytics.decline_analysis`**: Top decline reason codes, card brands, and volumes.
+* **`analytics.disputes`**: Chargeback monitoring, deadlines (`due_by`), and dispute resolution states.
+* **`analytics.forecasts`**: Direct alias to latest `ml.cash_flow_forecast` predictions for dashboard consumption.
+
+---
+
+### 2.3 `ml` — Predictive Models & Scored Recommendations
+* **`ml.cash_flow_forecast`**: Multi-quantile 13-week (91-day) cash projections generated by LightGBM quantile regression models:
+  * `p10_net_flow_usd`, `p50_net_flow_usd`, `p90_net_flow_usd`
+  * `p10_cumulative_cash_usd`, `p50_cumulative_cash_usd`, `p90_cumulative_cash_usd`
+  * `p10_runway_days`, `p50_runway_days`, `p90_runway_days`
+* **`ml.decline_predictions`**: Scored recommendations from XGBoost retry models:
+  * `retry_success_probability`: Estimated recovery likelihood ($0.0 - 1.0$).
+  * `recommended_action`: Optimal action policy (`retry_1h`, `retry_24h`, `retry_72h`, `do_not_retry`).
+  * `expected_recovery_usd`: Probability-weighted recoverable balance.
+* **`ml.model_registry`**: Active models, trained version tags, feature signatures, and validation metrics.
+
+---
+
+## 3. Signed Accounting Conventions
+
+To maintain double-entry integrity and mathematical consistency across reporting views, cash trajectory, and reconciliation:
+
+| Transaction Type | Amount (`amount` / `amount_usd`) | Net Amount (`net_amount` / `net_amount_usd`) | Cashflow View Impact |
+| :--- | :--- | :--- | :--- |
+| **`charge`** (succeeded) | Gross amount ($> 0$) | `amount - fee_amount` ($> 0$) | Inflow |
+| **`refund`** | Refunded amount ($> 0$) | `-abs(amount)` ($< 0$) | Outflow |
+| **`payout`** | Disbursed amount ($> 0$) | `-abs(amount)` ($< 0$) | Outflow |
+| **`fee`** | Processing fee ($> 0$) | `-abs(amount)` ($< 0$) | Outflow |
+| **`invoice_payment`** | Invoice amount ($> 0$) | Net settled ($> 0$) | Inflow |
+| **`transfer`** | Transfer amount ($> 0$) | Signed by direction (+/-) | Inflow / Outflow |
+| **Plaid bank debit** | Transaction amount ($> 0$) | `-amount_cents` ($< 0$) | Outflow |
+| **Plaid bank credit** | Transaction amount ($> 0$) | `+amount_cents` ($> 0$) | Inflow |
+
+**Reconciliation Rule:**
+When matching Stripe payouts to Plaid bank deposits:
+$$\text{Difference} = | |\text{net\_amount\_usd}_{\text{Stripe}}| - \text{net\_amount\_usd}_{\text{Bank}} |$$
+
+---
+
+## 4. Synthetic Data Generator Assumptions
+
+The synthetic data generator (`scripts/utils/generate_synthetic.py`) models realistic SaaS fintech operations:
+
+1. **Full Baseline Month (MoM Growth Stabilization):**
+   - The generator start date is aligned to the 1st of the baseline month (`start_date = (end_date - 365d).replace(day=1)`).
+   - This prevents fractional first-month anomalies where a partial 3-day baseline would cause month-2 MoM revenue to artificially spike +438%.
+   - Business volume follows a steady compounding growth curve (~2.5% to 3.5% MoM), mirroring high-growth SaaS trajectories.
+
+2. **Accounts Receivable Aging Recency Distribution:**
+   - Real-world B2B receivables are predominantly current.
+   - For `invoice_payment` transactions, occurrence dates are calibrated to:
+     - **Current (0–30 days):** ~50% of outstanding AR
+     - **Days 31–60:** ~25% of outstanding AR
+     - **Days 61–90:** ~15% of outstanding AR
+     - **Days 90+:** ~10% of outstanding AR
+   - This eliminates synthetic over-concentration in 90+ days (which previously reached ~81%).
+
+3. **Operating Expenses & Outflows:**
+   - Succeeded payouts include realistic vendor disbursements: AWS/GCP cloud infrastructure, Datadog monitoring, dev/ops contractors, and treasury bank sweeps.
+   - Processing fees are modeled as Stripe blended rate (2.9% + 30¢) plus wire/ACH transfer fees.
+
+4. **Model Training & Health Checks:**
+   - All datetime comparisons are timezone-aware using `timezone.utc`.
+   - Health checks verify transaction freshness within 48h, table row minimums, disk space, and ML model bundle availability.

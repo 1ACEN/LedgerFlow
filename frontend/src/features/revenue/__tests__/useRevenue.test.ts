@@ -99,4 +99,70 @@ describe('useRevenue logic', () => {
       expect(groups[2].net).toBe(14550);
     });
   });
+
+  describe('CFO Strategic Financial Intelligence computations', () => {
+    it('integrates full strategic response payload with margins, budget, customer tiers, and capital structure', () => {
+      const mockResponse = {
+        financial_summary: {
+          total_revenue_ttm: 6200000,
+          net_revenue_ttm: 5900000,
+          operating_expenses_ttm: 2400000,
+          operating_income_ttm: 3500000,
+          net_profit_ttm: 2975000,
+          gross_margin_pct: 95.2,
+          operating_margin_pct: 56.5,
+          net_margin_pct: 48.0,
+          mom_growth_pct: 12.5,
+          cash_flow_net_30d: 115000,
+        },
+        revenue_by_customer_tier: [
+          { tier: 'Enterprise Tier', plan_key: 'enterprise', customer_count: 195, total_revenue: 1750000, percentage: 28.2, transactions_count: 2900 },
+          { tier: 'Professional Plan', plan_key: 'pro', customer_count: 395, total_revenue: 3750000, percentage: 60.5, transactions_count: 6000 },
+        ],
+        top_customers: [
+          { name: 'Anderson-Sanders', tier: 'Enterprise Tier', country: 'PG', total_revenue: 27780, transactions_count: 23 },
+        ],
+        expenses_by_department: [
+          { department: 'Engineering & R&D', key: 'engineering', amount_usd: 1200000, percentage: 50.0 },
+          { department: 'Sales & AE', key: 'sales', amount_usd: 600000, percentage: 25.0 },
+        ],
+        budget_vs_actual: [
+          { line_item: 'Gross Invoiced Revenue', category: 'Revenue', actual_usd: 6200000, budget_usd: 5800000, variance_usd: 400000, variance_pct: 6.9, status: 'favorable' as const },
+        ],
+        financial_performance_trends: [
+          { month: '2026-10', gross_revenue: 550000, cogs: 25000, operating_expenses: 210000, operating_income: 315000, operating_margin_pct: 57.3 },
+        ],
+        forecasting: {
+          q1_projected_revenue: 1650000,
+          q1_projected_income: 940000,
+          q2_projected_revenue: 1780000,
+          q2_projected_income: 1010000,
+          target_operating_margin_pct: 62.5,
+          projected_cagr_pct: 14.2,
+          confidence_interval: '95% Bayesian Posterior',
+        },
+        debt_capital_structure: {
+          total_debt_usd: 1250000,
+          total_equity_usd: 14500000,
+          debt_to_equity_ratio: 0.09,
+          interest_coverage_ratio: 16.4,
+          quick_ratio: 4.8,
+          credit_facility_capacity_usd: 5000000,
+          capital_structure_status: 'Conservative / High Solvency',
+        },
+      };
+
+      const kpis = computeRevenueKpis(sampleRows, mockResponse);
+      expect(kpis.totalRevenue).toBe(6200000);
+      expect(kpis.netProfit).toBe(2975000);
+      expect(kpis.operatingMarginPct).toBe(56.5);
+      expect(kpis.netMarginPct).toBe(48.0);
+      expect(kpis.customerTiers).toHaveLength(2);
+      expect(kpis.topCustomers).toHaveLength(1);
+      expect(kpis.expensesByDept).toHaveLength(2);
+      expect(kpis.budgetVsActual[0].status).toBe('favorable');
+      expect(kpis.performanceTrends).toHaveLength(1);
+      expect(kpis.debtStructure.debt_to_equity_ratio).toBe(0.09);
+    });
+  });
 });

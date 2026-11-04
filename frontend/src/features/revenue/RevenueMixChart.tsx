@@ -9,12 +9,12 @@ interface Props {
 }
 
 const MIX_COLORS = [
-  'rgba(59,130,246,0.85)',
-  'rgba(16,185,129,0.85)',
-  'rgba(245,158,11,0.85)',
-  'rgba(139,92,246,0.85)',
-  'rgba(6,182,212,0.85)',
-  'rgba(249,115,22,0.85)',
+  'rgba(59, 130, 246, 0.9)',
+  'rgba(16, 185, 129, 0.9)',
+  'rgba(245, 158, 11, 0.9)',
+  'rgba(139, 92, 246, 0.9)',
+  'rgba(14, 165, 233, 0.9)',
+  'rgba(249, 115, 22, 0.9)',
 ];
 
 export default function RevenueMixChart({ rows }: Props) {
@@ -29,7 +29,7 @@ export default function RevenueMixChart({ rows }: Props) {
           {
             data: products.map((p) => p.total),
             backgroundColor: products.map((_, i) => MIX_COLORS[i % MIX_COLORS.length]),
-            borderColor: '#0c1019',
+            borderColor: '#121827',
             borderWidth: 2,
             hoverOffset: 6,
           },

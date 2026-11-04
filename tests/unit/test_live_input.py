@@ -258,6 +258,13 @@ class TestAPIEndpoints:
             ]:
                 assert key in row
 
+        # Assert enriched collections and risk intelligence sections
+        for enriched_key in ["summary", "buckets", "collection_efficiency", "high_risk_accounts"]:
+            assert enriched_key in data
+        assert data["summary"]["total_outstanding_usd"] >= 0
+        assert len(data["buckets"]) == 4
+        assert data["collection_efficiency"]["dso_days"] >= 0
+
     def test_revenue_report_endpoint(self, client):
         """Verify GET /reports/revenue returns revenue by product and monthly P&L."""
         response = client.get("/reports/revenue")
@@ -271,6 +278,24 @@ class TestAPIEndpoints:
             row = data["revenue_by_product"][0]
             for key in ["month", "product_line", "revenue", "net_revenue"]:
                 assert key in row
+        for enriched_key in [
+            "financial_summary",
+            "revenue_by_customer_tier",
+            "top_customers",
+            "expenses_by_department",
+            "budget_vs_actual",
+            "financial_performance_trends",
+            "forecasting",
+            "debt_capital_structure",
+        ]:
+            assert enriched_key in data
+        assert "gross_margin_pct" in data["financial_summary"]
+        assert "operating_margin_pct" in data["financial_summary"]
+        assert "net_margin_pct" in data["financial_summary"]
+        assert isinstance(data["revenue_by_customer_tier"], list)
+        assert isinstance(data["top_customers"], list)
+        assert isinstance(data["expenses_by_department"], list)
+        assert isinstance(data["budget_vs_actual"], list)
 
     def test_cashflow_report_endpoint(self, client):
         """Verify GET /reports/cashflow returns forecast fan chart data and weekly flows."""
@@ -289,6 +314,26 @@ class TestAPIEndpoints:
             w_row = data["weekly"][0]
             for key in ["week", "inflows", "outflows", "net"]:
                 assert key in w_row
+        for enriched_key in [
+            "current_cash_reserves",
+            "net_cash_flow_30d",
+            "operating_cash_flow_30d",
+            "free_cash_flow_30d",
+            "inflows_breakdown",
+            "outflows_breakdown",
+            "monthly_trends",
+            "quarterly_trends",
+            "actual_history_30d",
+            "scenarios",
+        ]:
+            assert enriched_key in data
+        assert isinstance(data["inflows_breakdown"], list)
+        assert isinstance(data["outflows_breakdown"], list)
+        assert isinstance(data["monthly_trends"], list)
+        assert isinstance(data["quarterly_trends"], list)
+        assert "worst_case" in data["scenarios"]
+        assert "base_case" in data["scenarios"]
+        assert "best_case" in data["scenarios"]
 
     def test_executive_report_endpoint(self, client):
         """Verify GET /reports/executive returns cash, runway, and cash trajectory trend."""
@@ -340,6 +385,21 @@ class TestAPIEndpoints:
         if data["disputes"]:
             for key in ["dispute_id", "transaction_id", "customer_id", "amount_usd", "status"]:
                 assert key in data["disputes"][0]
+        for enriched_key in [
+            "transaction_monitoring",
+            "ai_anomaly_detection",
+            "payment_processing_metrics",
+            "fraud_risk_indicators",
+            "automation_performance",
+            "ai_insights",
+        ]:
+            assert enriched_key in data
+        assert "overall_success_rate" in data["transaction_monitoring"]
+        assert "system_health_score" in data["ai_anomaly_detection"]
+        assert isinstance(data["payment_processing_metrics"]["gateways"], list)
+        assert "dispute_rate_bps" in data["fraud_risk_indicators"]
+        assert "automated_recovery_rate_pct" in data["automation_performance"]
+        assert isinstance(data["ai_insights"], list)
 
     def test_static_assets_mounted(self, client):
         """Verify static assets route is mounted."""

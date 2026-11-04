@@ -66,18 +66,14 @@ export const TransactionStreamCard: React.FC<TransactionStreamCardProps> = ({
         {/* Stream Toggle Control */}
         <button
           onClick={onTogglePolling}
+          className="link-btn"
           style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            background: pollingEnabled ? 'var(--green-soft)' : 'rgba(255,255,255,0.05)',
-            border: `1px solid ${pollingEnabled ? 'rgba(16,185,129,0.3)' : 'var(--border)'}`,
+            background: pollingEnabled ? 'var(--green-soft)' : undefined,
+            borderColor: pollingEnabled ? 'rgba(16,185,129,0.3)' : undefined,
             color: pollingEnabled ? 'var(--green)' : 'var(--text-secondary)',
-            padding: '5px 11px',
-            borderRadius: 'var(--radius-sm)',
-            fontSize: 11,
             fontWeight: 600,
-            cursor: 'pointer',
+            fontSize: 11,
+            padding: '4px 10px',
           }}
           title={pollingEnabled ? 'Pause live polling' : 'Resume live stream'}
         >
@@ -92,7 +88,7 @@ export const TransactionStreamCard: React.FC<TransactionStreamCardProps> = ({
             <div className="empty-state-desc">Transactions will appear here as they arrive</div>
           </div>
         ) : (
-          <div className="feed-list" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="feed-list">
             {transactions.map((t) => {
               const isPos = ['charge', 'invoice_payment'].includes(t.type) && t.status === 'succeeded';
               const isNeg = ['refund', 'fee', 'payout'].includes(t.type) || (t.net_amount_usd != null && t.net_amount_usd < 0);
@@ -103,67 +99,25 @@ export const TransactionStreamCard: React.FC<TransactionStreamCardProps> = ({
                 <div
                   key={t.transaction_id}
                   className="feed-item"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                    padding: '10px 14px',
-                    background: 'rgba(12, 16, 25, 0.65)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius-sm)',
-                    transition: 'var(--transition)',
-                  }}
                 >
-                  <div
-                    className="feed-type-badge"
-                    style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 'var(--radius-sm)',
-                      background: 'rgba(255, 255, 255, 0.04)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 10,
-                      fontWeight: 700,
-                      color: 'var(--text-secondary)',
-                      flexShrink: 0,
-                    }}
-                  >
+                  <div className="feed-type-badge">
                     {getTypeTag(t.type)}
                   </div>
 
-                  <div className="feed-info" style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      className="feed-id"
-                      style={{
-                        fontFamily: "'JetBrains Mono', monospace",
-                        fontSize: 11,
-                        color: 'var(--text-muted)',
-                      }}
-                    >
+                  <div className="feed-info">
+                    <div className="feed-id">
                       {shortId(t.transaction_id)}
                     </div>
-                    <div
-                      className="feed-desc"
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 600,
-                        color: 'var(--text-primary)',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
-                    >
+                    <div className="feed-desc">
                       {t.description || t.product_line?.replace(/_/g, ' ') || '—'}
                     </div>
-                    <div className="feed-tags" style={{ display: 'flex', gap: 6, marginTop: 3 }}>
+                    <div className="feed-tags">
                       <span
                         className={`tag source-${t.source}`}
                         style={{
                           fontSize: 10,
                           fontWeight: 600,
-                          padding: '1px 6px',
+                          padding: '2px 7px',
                           borderRadius: 4,
                           background: 'rgba(255, 255, 255, 0.05)',
                           color: 'var(--text-secondary)',
@@ -177,7 +131,7 @@ export const TransactionStreamCard: React.FC<TransactionStreamCardProps> = ({
                         style={{
                           fontSize: 10,
                           fontWeight: 600,
-                          padding: '1px 6px',
+                          padding: '2px 7px',
                           borderRadius: 4,
                           background: 'var(--accent-soft)',
                           color: 'var(--accent)',
@@ -189,28 +143,17 @@ export const TransactionStreamCard: React.FC<TransactionStreamCardProps> = ({
                     </div>
                   </div>
 
-                  <div className="feed-amount" style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div className="feed-amount">
                     <div
                       className="feed-usd"
-                      style={{
-                        fontSize: 14,
-                        fontWeight: 700,
-                        color: amtColor,
-                        fontFamily: "'JetBrains Mono', monospace",
-                      }}
+                      style={{ color: amtColor }}
                     >
                       {sign}{fmtUsd(Math.abs(t.amount_usd))}
                     </div>
                     <div
                       className={`feed-status ${t.status}`}
                       style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 4,
-                        fontSize: 11,
-                        fontWeight: 600,
                         color: t.status === 'succeeded' ? 'var(--green)' : t.status === 'failed' ? 'var(--red)' : 'var(--yellow)',
-                        textTransform: 'capitalize',
                       }}
                     >
                       <span

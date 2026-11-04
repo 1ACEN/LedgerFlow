@@ -27,65 +27,21 @@ export const SourceDistributionCard: React.FC<SourceDistributionCardProps> = ({ 
             <div className="empty-state-title">Loading sources…</div>
           </div>
         ) : (
-          <div className="source-list" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="source-list">
             {entries.map(([src, cnt]) => {
               const pct = Math.round((cnt / maxVal) * 100);
               return (
-                <div
-                  key={src}
-                  className="source-row"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                    fontSize: 12,
-                  }}
-                >
-                  <span
-                    className="source-name"
-                    style={{
-                      width: 110,
-                      fontWeight: 600,
-                      color: 'var(--text-primary)',
-                      textTransform: 'capitalize',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
+                <div key={src} className="source-row">
+                  <span className="source-name">
                     {src.replace(/_/g, ' ')}
                   </span>
-                  <div
-                    className="source-bar-track"
-                    style={{
-                      flex: 1,
-                      height: 8,
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      borderRadius: 4,
-                      overflow: 'hidden',
-                    }}
-                  >
+                  <div className="source-bar-track">
                     <div
                       className="source-bar"
-                      style={{
-                        width: `${pct}%`,
-                        height: '100%',
-                        background: 'linear-gradient(90deg, var(--accent), var(--purple))',
-                        borderRadius: 4,
-                        transition: 'width 0.4s ease',
-                      }}
+                      style={{ width: `${pct}%` }}
                     />
                   </div>
-                  <span
-                    className="source-count"
-                    style={{
-                      width: 65,
-                      textAlign: 'right',
-                      fontWeight: 600,
-                      fontFamily: "'JetBrains Mono', monospace",
-                      color: 'var(--text-secondary)',
-                    }}
-                  >
+                  <span className="source-count">
                     {cnt.toLocaleString()}
                   </span>
                 </div>

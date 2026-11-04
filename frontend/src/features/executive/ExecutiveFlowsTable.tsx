@@ -3,6 +3,7 @@ import type { CashTrendPoint } from './useExecutive';
 
 interface ExecutiveFlowsTableProps {
   trend: CashTrendPoint[];
+  style?: React.CSSProperties;
 }
 
 function fmtUsd(v: number): string {
@@ -13,12 +14,12 @@ function fmtUsd(v: number): string {
   }).format(v);
 }
 
-export const ExecutiveFlowsTable: React.FC<ExecutiveFlowsTableProps> = ({ trend }) => {
+export const ExecutiveFlowsTable: React.FC<ExecutiveFlowsTableProps> = ({ trend, style }) => {
   // Present rows in reverse chronological order (newest date first)
   const rows = [...trend].reverse();
 
   return (
-    <div className="card animate-in stagger-4" style={{ marginTop: 20 }}>
+    <div className="card animate-in stagger-4" style={{ marginTop: 0, ...style }}>
       <div className="card-header">
         <div>
           <span className="card-title">30-Day Liquidity & Cash Flow Ledger</span>

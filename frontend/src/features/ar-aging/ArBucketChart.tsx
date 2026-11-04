@@ -9,10 +9,10 @@ interface Props {
 }
 
 const BUCKET_COLORS = [
-  'rgba(16,185,129,0.85)', // Current
-  'rgba(245,158,11,0.85)', // 31-60
-  'rgba(249,115,22,0.85)', // 61-90
-  'rgba(239,68,68,0.85)',  // 90+
+  'rgba(16, 185, 129, 0.9)', // Current
+  'rgba(245, 158, 11, 0.9)', // 31-60
+  'rgba(249, 115, 22, 0.9)', // 61-90
+  'rgba(244, 63, 94, 0.9)',  // 90+
 ];
 
 // Doughnut of dollar concentration per aging bucket. Config ports the
@@ -35,7 +35,7 @@ export default function ArBucketChart({ aging }: Props) {
           {
             data: bucketVals,
             backgroundColor: BUCKET_COLORS,
-            borderColor: '#0c1019',
+            borderColor: '#121827',
             borderWidth: 2,
             hoverOffset: 6,
           },

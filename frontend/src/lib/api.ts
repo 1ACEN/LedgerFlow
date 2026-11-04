@@ -20,10 +20,10 @@ export function timeAgo(iso: string | null | undefined): string {
 
 export const CHART_LEGEND = {
   labels: {
-    color: '#8da2c0',
-    font: { size: 11 },
+    color: '#94a3b8',
+    font: { size: 11, family: "'Inter', sans-serif" },
     padding: 16,
     usePointStyle: true,
-    pointStyleWidth: 8,
+    pointStyleWidth: 7,
   },
 } as const;

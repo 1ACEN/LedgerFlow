@@ -358,24 +358,6 @@ export const ManualTransactionForm: React.FC<ManualTransactionFormProps> = ({
             type="submit"
             className="submit-btn"
             disabled={submitting}
-            style={{
-              width: '100%',
-              padding: '11px 16px',
-              background: 'var(--accent)',
-              border: 'none',
-              borderRadius: 'var(--radius-sm)',
-              color: '#ffffff',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: submitting ? 'not-allowed' : 'pointer',
-              opacity: submitting ? 0.7 : 1,
-              transition: 'var(--transition)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-              boxShadow: '0 0 16px var(--accent-glow)',
-            }}
           >
             {submitting ? 'Ingesting…' : 'Ingest Live Transaction'}
           </button>
