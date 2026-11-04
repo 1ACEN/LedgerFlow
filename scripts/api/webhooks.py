@@ -584,7 +584,7 @@ async def report_executive():
             fin_30d = conn.execute("""
                 SELECT
                     COALESCE(SUM(amount_usd) FILTER (WHERE type IN ('charge', 'invoice_payment') AND status = 'succeeded'), 0.0) AS revenue_30d,
-                    COALESCE(SUM(amount_usd) FILTER (WHERE type IN ('payout', 'fee') AND status = 'succeeded') + COALESCE(SUM(amount_usd) FILTER (WHERE type = 'refund' AND status = 'succeeded'), 0.0), 0.0) AS expenses_30d,
+                    COALESCE(SUM(amount_usd) FILTER (WHERE type IN ('payout', 'fee') AND status = 'succeeded'), 0.0) + COALESCE(SUM(amount_usd) FILTER (WHERE type = 'refund' AND status = 'succeeded'), 0.0) AS expenses_30d,
                     COALESCE(SUM(fee_amount_usd) FILTER (WHERE status = 'succeeded'), 0.0) AS fees_30d,
                     COALESCE(SUM(net_amount_usd) FILTER (WHERE status = 'succeeded'), 0.0) AS net_profit_30d
                 FROM transactions
@@ -604,7 +604,7 @@ async def report_executive():
                 SELECT
                     DATE_TRUNC('month', occurred_at)::DATE AS month,
                     ROUND(COALESCE(SUM(amount_usd) FILTER (WHERE type IN ('charge', 'invoice_payment') AND status = 'succeeded'), 0.0), 2) AS revenue,
-                    ROUND(COALESCE(SUM(amount_usd) FILTER (WHERE type IN ('payout', 'fee') AND status = 'succeeded') + COALESCE(SUM(amount_usd) FILTER (WHERE type = 'refund' AND status = 'succeeded'), 0.0), 0.0), 2) AS expenses,
+                    ROUND(COALESCE(SUM(amount_usd) FILTER (WHERE type IN ('payout', 'fee') AND status = 'succeeded'), 0.0) + COALESCE(SUM(amount_usd) FILTER (WHERE type = 'refund' AND status = 'succeeded'), 0.0), 2) AS expenses,
                     ROUND(COALESCE(SUM(net_amount_usd) FILTER (WHERE status = 'succeeded'), 0.0), 2) AS net_profit
                 FROM transactions
                 WHERE occurred_at IS NOT NULL
