@@ -64,7 +64,7 @@ export default function ArAgingTable({ aging }: Props) {
       <div
         style={{
           padding: '16px 20px',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+          borderBottom: '1px solid var(--border)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -81,9 +81,9 @@ export default function ArAgingTable({ aging }: Props) {
               fontSize: 11.5,
               fontWeight: 600,
               borderRadius: 6,
-              background: bucketFilter === 'all' ? 'var(--accent)' : 'rgba(255, 255, 255, 0.04)',
+              background: bucketFilter === 'all' ? 'var(--accent)' : 'var(--pill-bg)',
               color: bucketFilter === 'all' ? '#fff' : 'var(--text-secondary)',
-              border: `1px solid ${bucketFilter === 'all' ? 'var(--accent)' : 'rgba(255, 255, 255, 0.08)'}`,
+              border: `1px solid ${bucketFilter === 'all' ? 'var(--accent)' : 'var(--pill-border)'}`,
               cursor: 'pointer',
             }}
           >
@@ -97,9 +97,9 @@ export default function ArAgingTable({ aging }: Props) {
               fontSize: 11.5,
               fontWeight: 600,
               borderRadius: 6,
-              background: bucketFilter === 'critical' ? 'rgba(244, 63, 94, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+              background: bucketFilter === 'critical' ? 'rgba(244, 63, 94, 0.2)' : 'var(--pill-bg)',
               color: bucketFilter === 'critical' ? '#fb7185' : 'var(--text-secondary)',
-              border: `1px solid ${bucketFilter === 'critical' ? '#f43f5e' : 'rgba(255, 255, 255, 0.08)'}`,
+              border: `1px solid ${bucketFilter === 'critical' ? '#f43f5e' : 'var(--pill-border)'}`,
               cursor: 'pointer',
             }}
           >
@@ -113,9 +113,9 @@ export default function ArAgingTable({ aging }: Props) {
               fontSize: 11.5,
               fontWeight: 600,
               borderRadius: 6,
-              background: bucketFilter === 'elevated' ? 'rgba(249, 115, 22, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+              background: bucketFilter === 'elevated' ? 'rgba(249, 115, 22, 0.2)' : 'var(--pill-bg)',
               color: bucketFilter === 'elevated' ? '#fb923c' : 'var(--text-secondary)',
-              border: `1px solid ${bucketFilter === 'elevated' ? '#f97316' : 'rgba(255, 255, 255, 0.08)'}`,
+              border: `1px solid ${bucketFilter === 'elevated' ? '#f97316' : 'var(--pill-border)'}`,
               cursor: 'pointer',
             }}
           >
@@ -129,9 +129,9 @@ export default function ArAgingTable({ aging }: Props) {
               fontSize: 11.5,
               fontWeight: 600,
               borderRadius: 6,
-              background: bucketFilter === 'moderate' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+              background: bucketFilter === 'moderate' ? 'rgba(245, 158, 11, 0.2)' : 'var(--pill-bg)',
               color: bucketFilter === 'moderate' ? '#fbbf24' : 'var(--text-secondary)',
-              border: `1px solid ${bucketFilter === 'moderate' ? '#f59e0b' : 'rgba(255, 255, 255, 0.08)'}`,
+              border: `1px solid ${bucketFilter === 'moderate' ? '#f59e0b' : 'var(--pill-border)'}`,
               cursor: 'pointer',
             }}
           >
@@ -145,9 +145,9 @@ export default function ArAgingTable({ aging }: Props) {
               fontSize: 11.5,
               fontWeight: 600,
               borderRadius: 6,
-              background: bucketFilter === 'current' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+              background: bucketFilter === 'current' ? 'rgba(16, 185, 129, 0.2)' : 'var(--pill-bg)',
               color: bucketFilter === 'current' ? '#34d399' : 'var(--text-secondary)',
-              border: `1px solid ${bucketFilter === 'current' ? '#10b981' : 'rgba(255, 255, 255, 0.08)'}`,
+              border: `1px solid ${bucketFilter === 'current' ? '#10b981' : 'var(--pill-border)'}`,
               cursor: 'pointer',
             }}
           >
@@ -166,8 +166,8 @@ export default function ArAgingTable({ aging }: Props) {
               width: '100%',
               padding: '7px 12px',
               fontSize: 12,
-              background: 'rgba(255, 255, 255, 0.04)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+              background: 'var(--bg-input)',
+              border: '1px solid var(--border)',
               borderRadius: 6,
               color: 'var(--text-primary)',
               outline: 'none',
@@ -258,7 +258,7 @@ export default function ArAgingTable({ aging }: Props) {
                                   fontWeight: 700,
                                   padding: '1px 5px',
                                   borderRadius: 3,
-                                  background: 'rgba(255, 255, 255, 0.06)',
+                                  background: 'var(--pill-bg)',
                                   color: 'var(--text-secondary)',
                                 }}
                               >
@@ -283,7 +283,7 @@ export default function ArAgingTable({ aging }: Props) {
                         <div
                           style={{
                             height: 7,
-                            background: 'rgba(255, 255, 255, 0.05)',
+                            background: 'var(--track-bg)',
                             borderRadius: 3.5,
                             display: 'flex',
                             overflow: 'hidden',
@@ -366,9 +366,9 @@ export default function ArAgingTable({ aging }: Props) {
                               padding: '4px 8px',
                               fontSize: 11,
                               fontWeight: 600,
-                              background: 'rgba(255, 255, 255, 0.04)',
+                              background: 'var(--pill-bg)',
                               color: 'var(--text-secondary)',
-                              border: '1px solid rgba(255, 255, 255, 0.08)',
+                              border: '1px solid var(--pill-border)',
                               borderRadius: 4,
                               cursor: 'pointer',
                             }}
@@ -389,7 +389,7 @@ export default function ArAgingTable({ aging }: Props) {
         <div
           style={{
             padding: '12px 20px',
-            borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+            borderTop: '1px solid var(--border)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -431,9 +431,9 @@ export default function ArAgingTable({ aging }: Props) {
                   padding: '4px 10px',
                   fontSize: 11,
                   fontWeight: 600,
-                  background: 'rgba(255, 255, 255, 0.06)',
+                  background: 'var(--pill-bg)',
                   color: 'var(--text-primary)',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  border: '1px solid var(--border)',
                   borderRadius: 4,
                   cursor: 'pointer',
                 }}

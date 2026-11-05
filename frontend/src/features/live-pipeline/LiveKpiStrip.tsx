@@ -35,7 +35,7 @@ export const LiveKpiStrip: React.FC<LiveKpiStripProps> = ({ kpis, loading }) => 
   return (
     <div className="grid-4">
       {/* Metric 1: Total Transactions */}
-      <div className="metric-card animate-in stagger-1">
+      <div className="metric-card accent-blue animate-in stagger-1">
         <div className="metric-label">Total Transactions</div>
         <div className="metric-value" style={{ color: 'var(--accent)' }}>
           {kpis.totalTransactions > 0 ? kpis.totalTransactions.toLocaleString() : '—'}
@@ -44,7 +44,7 @@ export const LiveKpiStrip: React.FC<LiveKpiStripProps> = ({ kpis, loading }) => 
       </div>
 
       {/* Metric 2: Today's Ingested Volume */}
-      <div className="metric-card animate-in stagger-2">
+      <div className="metric-card accent-green animate-in stagger-2">
         <div className="metric-label">Today's Ingested Volume</div>
         <div className="metric-value" style={{ color: 'var(--green)' }}>
           {kpis.todayVolume.toLocaleString()}
@@ -55,7 +55,7 @@ export const LiveKpiStrip: React.FC<LiveKpiStripProps> = ({ kpis, loading }) => 
       </div>
 
       {/* Metric 3: Live Success Rate */}
-      <div className="metric-card animate-in stagger-3">
+      <div className="metric-card accent-yellow animate-in stagger-3">
         <div className="metric-label">Live Success Rate</div>
         <div className="metric-value" style={{ color: 'var(--yellow)' }}>
           {kpis.liveSuccessRate != null ? `${kpis.liveSuccessRate}%` : '—'}
@@ -64,7 +64,7 @@ export const LiveKpiStrip: React.FC<LiveKpiStripProps> = ({ kpis, loading }) => 
       </div>
 
       {/* Metric 4: Last Ingested Event */}
-      <div className="metric-card animate-in stagger-4">
+      <div className="metric-card accent-purple animate-in stagger-4">
         <div className="metric-label">Last Ingested Event</div>
         <div
           className="metric-value"

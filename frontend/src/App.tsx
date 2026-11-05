@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { TABS } from './lib/tabs';
+import { ThemeProvider } from './lib/ThemeContext';
+import { ThemeToggle } from './components/ThemeToggle';
 import ArAgingTab from './features/ar-aging/ArAgingTab';
 import RevenueTab from './features/revenue/RevenueTab';
 import CashflowTab from './features/cashflow/CashflowTab';
@@ -11,7 +13,7 @@ function formatLastUpdated(d: Date): string {
   return 'Updated ' + d.toLocaleTimeString();
 }
 
-export default function App() {
+function MainDashboard() {
   const [activeTab, setActiveTab] = useState('ar-aging');
   const [lastUpdated, setLastUpdated] = useState(() => formatLastUpdated(new Date()));
   const [refreshKey, setRefreshKey] = useState(0);
@@ -28,7 +30,7 @@ export default function App() {
   };
 
   return (
-    <div>
+    <div className="app-container">
       <header className="app-header">
         <div className="header-inner">
           <div className="logo">
@@ -55,6 +57,7 @@ export default function App() {
               <div className="demo-dot"></div>
               <span>Live Stream</span>
             </div>
+            <ThemeToggle />
             <button className="refresh-btn" onClick={handleRefresh} title="Refresh current tab">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
@@ -100,5 +103,13 @@ export default function App() {
         {activeTab === 'live-pipeline' && <LivePipelineTab refreshKey={refreshKey} />}
       </main>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <MainDashboard />
+    </ThemeProvider>
   );
 }

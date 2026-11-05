@@ -202,17 +202,7 @@ export const ActualVsForecastChart = ({
         </div>
 
         {/* Interactive Scenario Filter Buttons */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            background: 'rgba(255, 255, 255, 0.04)',
-            padding: 3,
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--border)',
-          }}
-        >
+        <div className="filter-group">
           <button
             className={`filter-btn ${selectedScenario === 'all' ? 'active' : ''}`}
             onClick={() => setSelectedScenario('all')}

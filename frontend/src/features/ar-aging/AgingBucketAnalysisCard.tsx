@@ -73,7 +73,7 @@ export default function AgingBucketAnalysisCard({ buckets, totalOutstanding }: P
         <div
           style={{
             height: 12,
-            background: 'rgba(255, 255, 255, 0.05)',
+            background: 'var(--track-bg)',
             borderRadius: 6,
             display: 'flex',
             overflow: 'hidden',

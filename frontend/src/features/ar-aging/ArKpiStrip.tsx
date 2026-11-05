@@ -19,7 +19,7 @@ export default function ArKpiStrip({ summary, efficiency }: Props) {
         }}
       >
         {/* Card 1: Total Outstanding AR */}
-        <div className="metric-card animate-in stagger-1" style={{ position: 'relative', overflow: 'hidden' }}>
+        <div className="metric-card accent-blue animate-in stagger-1" style={{ position: 'relative', overflow: 'hidden' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <span className="metric-label" style={{ fontWeight: 600 }}>Total AR Outstanding</span>
             <span
@@ -46,7 +46,7 @@ export default function ArKpiStrip({ summary, efficiency }: Props) {
         </div>
 
         {/* Card 2: Current vs Overdue Ratio */}
-        <div className="metric-card animate-in stagger-2" style={{ position: 'relative', overflow: 'hidden' }}>
+        <div className="metric-card accent-red animate-in stagger-2" style={{ position: 'relative', overflow: 'hidden' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <span className="metric-label" style={{ fontWeight: 600 }}>Overdue Delinquency</span>
             <span
@@ -71,7 +71,7 @@ export default function ArKpiStrip({ summary, efficiency }: Props) {
             <div
               style={{
                 height: 5,
-                background: 'rgba(255, 255, 255, 0.08)',
+                background: 'var(--track-bg)',
                 borderRadius: 3,
                 display: 'flex',
                 overflow: 'hidden',
@@ -94,7 +94,7 @@ export default function ArKpiStrip({ summary, efficiency }: Props) {
         </div>
 
         {/* Card 3: Days Sales Outstanding (DSO) */}
-        <div className="metric-card animate-in stagger-3" style={{ position: 'relative', overflow: 'hidden' }}>
+        <div className="metric-card accent-green animate-in stagger-3" style={{ position: 'relative', overflow: 'hidden' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <span className="metric-label" style={{ fontWeight: 600 }}>DSO (Turnover)</span>
             <span
@@ -121,7 +121,7 @@ export default function ArKpiStrip({ summary, efficiency }: Props) {
         </div>
 
         {/* Card 4: Collection Effectiveness Index (CEI) */}
-        <div className="metric-card animate-in stagger-4" style={{ position: 'relative', overflow: 'hidden' }}>
+        <div className="metric-card accent-cyan animate-in stagger-4" style={{ position: 'relative', overflow: 'hidden' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <span className="metric-label" style={{ fontWeight: 600 }}>Collection Efficiency (CEI)</span>
             <span
@@ -148,7 +148,7 @@ export default function ArKpiStrip({ summary, efficiency }: Props) {
         </div>
 
         {/* Card 5: Bad Debt Reserve Provision */}
-        <div className="metric-card animate-in stagger-5" style={{ position: 'relative', overflow: 'hidden' }}>
+        <div className="metric-card accent-yellow animate-in stagger-5" style={{ position: 'relative', overflow: 'hidden' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <span className="metric-label" style={{ fontWeight: 600 }}>Bad Debt Provision</span>
             <span
@@ -177,6 +177,7 @@ export default function ArKpiStrip({ summary, efficiency }: Props) {
 
       {/* Secondary Collections Telemetry Ticker */}
       <div
+        className="telemetry-strip"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -184,9 +185,6 @@ export default function ArKpiStrip({ summary, efficiency }: Props) {
           flexWrap: 'wrap',
           gap: 12,
           padding: '10px 18px',
-          background: 'rgba(255, 255, 255, 0.02)',
-          border: '1px solid rgba(255, 255, 255, 0.06)',
-          borderRadius: 8,
           fontSize: 12,
         }}
       >

@@ -54,7 +54,7 @@ export const AiInsightsCard = ({ insights }: AiInsightsCardProps) => {
                         textTransform: 'uppercase',
                         padding: '1px 6px',
                         borderRadius: 'var(--radius-xs)',
-                        background: 'rgba(255, 255, 255, 0.06)',
+                        background: 'var(--pill-bg)',
                         color: 'var(--text-secondary)',
                       }}
                     >
@@ -84,7 +84,7 @@ export const AiInsightsCard = ({ insights }: AiInsightsCardProps) => {
                     fontSize: 11.5,
                     color: 'var(--green)',
                     fontWeight: 600,
-                    borderTop: '1px solid rgba(255, 255, 255, 0.04)',
+                    borderTop: '1px solid var(--border)',
                     paddingTop: 6,
                     marginTop: 2,
                   }}

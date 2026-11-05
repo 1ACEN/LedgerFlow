@@ -20,15 +20,7 @@ export const ExecutiveSummaryBanner: React.FC<ExecutiveSummaryBannerProps> = ({ 
   const isRunwaySolid = kpis.runwayDays >= 180;
 
   return (
-    <div
-      className="card animate-in stagger-1"
-      style={{
-        background: 'linear-gradient(135deg, rgba(20, 27, 43, 0.8) 0%, rgba(13, 18, 30, 0.95) 100%)',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
-        boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.08), var(--shadow-card)',
-        padding: '20px 24px',
-      }}
-    >
+    <div className="card executive-banner animate-in stagger-1">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

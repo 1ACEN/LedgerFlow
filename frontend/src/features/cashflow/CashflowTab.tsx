@@ -107,17 +107,7 @@ export default function CashflowTab({ refreshKey }: Props) {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           {/* Module View Mode Pills */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              background: 'rgba(255, 255, 255, 0.04)',
-              padding: 3,
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--border)',
-            }}
-          >
+          <div className="filter-group">
             <button
               className={`filter-btn ${activeFocus === 'all' ? 'active' : ''}`}
               onClick={() => setActiveFocus('all')}

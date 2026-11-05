@@ -34,7 +34,7 @@ export const FinancialHealthRiskCard: React.FC<FinancialHealthRiskCardProps> = (
         <div
           style={{
             padding: '12px 14px',
-            background: 'rgba(255, 255, 255, 0.025)',
+            background: 'var(--surface-subtle)',
             border: '1px solid var(--border)',
             borderRadius: 'var(--radius-sm)',
             display: 'flex',
@@ -66,7 +66,7 @@ export const FinancialHealthRiskCard: React.FC<FinancialHealthRiskCardProps> = (
         <div
           style={{
             padding: '12px 14px',
-            background: 'rgba(255, 255, 255, 0.025)',
+            background: 'var(--surface-subtle)',
             border: '1px solid var(--border)',
             borderRadius: 'var(--radius-sm)',
             display: 'flex',
@@ -94,7 +94,7 @@ export const FinancialHealthRiskCard: React.FC<FinancialHealthRiskCardProps> = (
         <div
           style={{
             padding: '12px 14px',
-            background: 'rgba(255, 255, 255, 0.025)',
+            background: 'var(--surface-subtle)',
             border: '1px solid var(--border)',
             borderRadius: 'var(--radius-sm)',
             display: 'flex',
@@ -122,7 +122,7 @@ export const FinancialHealthRiskCard: React.FC<FinancialHealthRiskCardProps> = (
         <div
           style={{
             padding: '12px 14px',
-            background: 'rgba(255, 255, 255, 0.025)',
+            background: 'var(--surface-subtle)',
             border: '1px solid var(--border)',
             borderRadius: 'var(--radius-sm)',
             display: 'flex',

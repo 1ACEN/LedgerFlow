@@ -39,17 +39,7 @@ export const MonthlyQuarterlyTrendsCard = ({
         </div>
 
         {/* View Mode Toggle */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            background: 'rgba(255, 255, 255, 0.04)',
-            padding: 3,
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--border)',
-          }}
-        >
+        <div className="filter-group">
           <button
             className={`filter-btn ${viewMode === 'monthly' ? 'active' : ''}`}
             onClick={() => setViewMode('monthly')}

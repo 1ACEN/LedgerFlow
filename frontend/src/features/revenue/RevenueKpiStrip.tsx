@@ -36,15 +36,7 @@ export default function RevenueKpiStrip({ kpis, loading }: Props) {
         }}
       >
         {/* Card 1: Total Revenue (TTM) */}
-        <div
-          className="metric-card animate-in stagger-1"
-          style={{
-            padding: '20px 22px',
-            background: 'linear-gradient(180deg, rgba(20, 28, 48, 0.75) 0%, rgba(13, 18, 32, 0.9) 100%)',
-            border: '1px solid rgba(59, 130, 246, 0.22)',
-            boxShadow: 'inset 0 1px 0 0 rgba(59, 130, 246, 0.12), var(--shadow-sm)',
-          }}
-        >
+        <div className="metric-card accent-blue animate-in stagger-1" style={{ padding: '20px 22px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="metric-label" style={{ color: 'var(--text-secondary)' }}>
               Total Revenue (TTM)
@@ -77,15 +69,7 @@ export default function RevenueKpiStrip({ kpis, loading }: Props) {
         </div>
 
         {/* Card 2: Net Profit (TTM) */}
-        <div
-          className="metric-card animate-in stagger-2"
-          style={{
-            padding: '20px 22px',
-            background: 'linear-gradient(180deg, rgba(18, 36, 28, 0.75) 0%, rgba(12, 22, 18, 0.9) 100%)',
-            border: '1px solid rgba(16, 185, 129, 0.24)',
-            boxShadow: 'inset 0 1px 0 0 rgba(16, 185, 129, 0.12), var(--shadow-sm)',
-          }}
-        >
+        <div className="metric-card accent-green animate-in stagger-2" style={{ padding: '20px 22px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="metric-label" style={{ color: 'var(--text-secondary)' }}>
               Net Profit (TTM)
@@ -115,15 +99,7 @@ export default function RevenueKpiStrip({ kpis, loading }: Props) {
         </div>
 
         {/* Card 3: Operating Margin & EBIT */}
-        <div
-          className="metric-card animate-in stagger-3"
-          style={{
-            padding: '20px 22px',
-            background: 'linear-gradient(180deg, rgba(25, 28, 45, 0.75) 0%, rgba(15, 17, 30, 0.9) 100%)',
-            border: '1px solid rgba(139, 92, 246, 0.22)',
-            boxShadow: 'inset 0 1px 0 0 rgba(139, 92, 246, 0.12), var(--shadow-sm)',
-          }}
-        >
+        <div className="metric-card accent-purple animate-in stagger-3" style={{ padding: '20px 22px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="metric-label" style={{ color: 'var(--text-secondary)' }}>
               Operating Income (EBIT)
@@ -151,15 +127,7 @@ export default function RevenueKpiStrip({ kpis, loading }: Props) {
         </div>
 
         {/* Card 4: Gross Profit Margin */}
-        <div
-          className="metric-card animate-in stagger-4"
-          style={{
-            padding: '20px 22px',
-            background: 'linear-gradient(180deg, rgba(35, 28, 20, 0.75) 0%, rgba(22, 17, 13, 0.9) 100%)',
-            border: '1px solid rgba(245, 158, 11, 0.22)',
-            boxShadow: 'inset 0 1px 0 0 rgba(245, 158, 11, 0.12), var(--shadow-sm)',
-          }}
-        >
+        <div className="metric-card accent-yellow animate-in stagger-4" style={{ padding: '20px 22px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="metric-label" style={{ color: 'var(--text-secondary)' }}>
               Gross Profit Margin
@@ -189,15 +157,7 @@ export default function RevenueKpiStrip({ kpis, loading }: Props) {
         </div>
 
         {/* Card 5: Net Cash Flow (30D) */}
-        <div
-          className="metric-card animate-in stagger-4"
-          style={{
-            padding: '20px 22px',
-            background: 'linear-gradient(180deg, rgba(26, 32, 42, 0.75) 0%, rgba(15, 20, 28, 0.9) 100%)',
-            border: '1px solid rgba(14, 165, 233, 0.22)',
-            boxShadow: 'inset 0 1px 0 0 rgba(14, 165, 233, 0.12), var(--shadow-sm)',
-          }}
-        >
+        <div className="metric-card accent-cyan animate-in stagger-4" style={{ padding: '20px 22px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="metric-label" style={{ color: 'var(--text-secondary)' }}>
               Net Cash Flow (30D)
@@ -226,20 +186,7 @@ export default function RevenueKpiStrip({ kpis, loading }: Props) {
       </div>
 
       {/* Strategic Corporate Telemetry Strip */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-          gap: 12,
-          padding: '12px 18px',
-          background: 'rgba(14, 19, 31, 0.75)',
-          borderRadius: 'var(--radius-md)',
-          border: '1px solid var(--border)',
-          fontSize: 12,
-          color: 'var(--text-secondary)',
-          backdropFilter: 'blur(10px)',
-        }}
-      >
+      <div className="telemetry-strip">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ color: 'var(--text-muted)' }}>OpEx (TTM):</span>
           <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontFamily: "'JetBrains Mono', monospace" }}>

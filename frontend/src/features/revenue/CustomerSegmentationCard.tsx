@@ -33,17 +33,7 @@ export const CustomerSegmentationCard = ({
         </div>
 
         {/* Tab Toggle */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            background: 'rgba(255, 255, 255, 0.04)',
-            padding: 3,
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--border)',
-          }}
-        >
+        <div className="filter-group">
           <button
             className={`filter-btn ${tab === 'tiers' ? 'active' : ''}`}
             onClick={() => setTab('tiers')}
@@ -80,7 +70,7 @@ export const CustomerSegmentationCard = ({
                   key={tier.plan_key}
                   style={{
                     padding: '12px 14px',
-                    background: 'rgba(255, 255, 255, 0.02)',
+                    background: 'var(--surface-subtle)',
                     borderRadius: 'var(--radius-sm)',
                     border: '1px solid var(--border-subtle)',
                     display: 'flex',
@@ -111,7 +101,7 @@ export const CustomerSegmentationCard = ({
                   <div
                     style={{
                       height: 5,
-                      background: 'rgba(255, 255, 255, 0.05)',
+                      background: 'var(--track-bg)',
                       borderRadius: 3,
                       overflow: 'hidden',
                     }}

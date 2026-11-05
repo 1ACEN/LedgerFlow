@@ -40,7 +40,7 @@ export const FraudRiskIndicatorsCard = ({ fraud }: FraudRiskIndicatorsCardProps)
           <div
             style={{
               height: 10,
-              background: 'rgba(255, 255, 255, 0.05)',
+              background: 'var(--track-bg)',
               borderRadius: 5,
               display: 'flex',
               overflow: 'hidden',
@@ -100,7 +100,7 @@ export const FraudRiskIndicatorsCard = ({ fraud }: FraudRiskIndicatorsCardProps)
           <div
             style={{
               padding: '12px 14px',
-              background: 'rgba(255, 255, 255, 0.025)',
+              background: 'var(--surface-subtle)',
               border: '1px solid var(--border)',
               borderRadius: 'var(--radius-sm)',
             }}
@@ -119,7 +119,7 @@ export const FraudRiskIndicatorsCard = ({ fraud }: FraudRiskIndicatorsCardProps)
           <div
             style={{
               padding: '12px 14px',
-              background: 'rgba(255, 255, 255, 0.025)',
+              background: 'var(--surface-subtle)',
               border: '1px solid var(--border)',
               borderRadius: 'var(--radius-sm)',
             }}
@@ -138,7 +138,7 @@ export const FraudRiskIndicatorsCard = ({ fraud }: FraudRiskIndicatorsCardProps)
           <div
             style={{
               padding: '12px 14px',
-              background: 'rgba(255, 255, 255, 0.025)',
+              background: 'var(--surface-subtle)',
               border: '1px solid var(--border)',
               borderRadius: 'var(--radius-sm)',
             }}

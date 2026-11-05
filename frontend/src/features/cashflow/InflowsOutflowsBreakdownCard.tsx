@@ -82,7 +82,7 @@ export const InflowsOutflowsBreakdownCard = ({
                     <div
                       style={{
                         height: 5,
-                        background: 'rgba(255, 255, 255, 0.05)',
+                        background: 'var(--track-bg)',
                         borderRadius: 3,
                         overflow: 'hidden',
                       }}
@@ -151,7 +151,7 @@ export const InflowsOutflowsBreakdownCard = ({
                     <div
                       style={{
                         height: 5,
-                        background: 'rgba(255, 255, 255, 0.05)',
+                        background: 'var(--track-bg)',
                         borderRadius: 3,
                         overflow: 'hidden',
                       }}
@@ -181,7 +181,7 @@ export const InflowsOutflowsBreakdownCard = ({
             flexWrap: 'wrap',
             gap: 12,
             padding: '10px 14px',
-            background: 'rgba(255, 255, 255, 0.02)',
+            background: 'var(--surface-subtle)',
             borderRadius: 'var(--radius-sm)',
             border: '1px solid var(--border-subtle)',
             fontSize: 12,

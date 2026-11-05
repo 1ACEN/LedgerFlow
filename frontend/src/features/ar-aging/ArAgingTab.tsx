@@ -121,87 +121,39 @@ export default function ArAgingTab({ refreshKey }: Props) {
 
         {/* View Focus Pills & Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <div
-            style={{
-              display: 'flex',
-              background: 'rgba(255, 255, 255, 0.04)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: 8,
-              padding: 2,
-            }}
-          >
+          <div className="filter-group">
             <button
+              className={`filter-btn ${activeFocus === 'all' ? 'active' : ''}`}
               onClick={() => setActiveFocus('all')}
-              style={{
-                background: activeFocus === 'all' ? 'rgba(255, 255, 255, 0.12)' : 'transparent',
-                color: activeFocus === 'all' ? '#fff' : 'var(--text-secondary)',
-                border: 'none',
-                padding: '6px 12px',
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
+              style={{ fontSize: 11, padding: '4px 10px' }}
             >
               All Operations
             </button>
             <button
+              className={`filter-btn ${activeFocus === 'buckets' ? 'active' : ''}`}
               onClick={() => setActiveFocus('buckets')}
-              style={{
-                background: activeFocus === 'buckets' ? 'rgba(255, 255, 255, 0.12)' : 'transparent',
-                color: activeFocus === 'buckets' ? '#fff' : 'var(--text-secondary)',
-                border: 'none',
-                padding: '6px 12px',
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
+              style={{ fontSize: 11, padding: '4px 10px' }}
             >
               Aging Buckets
             </button>
             <button
+              className={`filter-btn ${activeFocus === 'efficiency' ? 'active' : ''}`}
               onClick={() => setActiveFocus('efficiency')}
-              style={{
-                background: activeFocus === 'efficiency' ? 'rgba(255, 255, 255, 0.12)' : 'transparent',
-                color: activeFocus === 'efficiency' ? '#fff' : 'var(--text-secondary)',
-                border: 'none',
-                padding: '6px 12px',
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
+              style={{ fontSize: 11, padding: '4px 10px' }}
             >
               Turnover &amp; DSO
             </button>
             <button
+              className={`filter-btn ${activeFocus === 'high_risk' ? 'active' : ''}`}
               onClick={() => setActiveFocus('high_risk')}
-              style={{
-                background: activeFocus === 'high_risk' ? 'rgba(244, 63, 94, 0.2)' : 'transparent',
-                color: activeFocus === 'high_risk' ? '#fb7185' : 'var(--text-secondary)',
-                border: 'none',
-                padding: '6px 12px',
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
+              style={{ fontSize: 11, padding: '4px 10px' }}
             >
               High Risk ({highRisk.length})
             </button>
             <button
+              className={`filter-btn ${activeFocus === 'ledger' ? 'active' : ''}`}
               onClick={() => setActiveFocus('ledger')}
-              style={{
-                background: activeFocus === 'ledger' ? 'rgba(255, 255, 255, 0.12)' : 'transparent',
-                color: activeFocus === 'ledger' ? '#fff' : 'var(--text-secondary)',
-                border: 'none',
-                padding: '6px 12px',
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
+              style={{ fontSize: 11, padding: '4px 10px' }}
             >
               Customer Ledger
             </button>
@@ -248,7 +200,7 @@ export default function ArAgingTab({ refreshKey }: Props) {
           <div
             style={{
               padding: '16px 20px',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+              borderBottom: '1px solid var(--border)',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
@@ -267,7 +219,7 @@ export default function ArAgingTab({ refreshKey }: Props) {
                     fontWeight: 700,
                     padding: '2px 6px',
                     borderRadius: 4,
-                    background: 'rgba(255, 255, 255, 0.08)',
+                    background: 'var(--pill-bg)',
                     color: 'var(--text-secondary)',
                   }}
                 >

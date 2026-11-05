@@ -43,7 +43,7 @@ export const ExecutiveAlertsCard: React.FC<ExecutiveAlertsCardProps> = ({ alerts
               ? 'rgba(245, 158, 11, 0.04)'
               : isDanger
               ? 'rgba(244, 63, 94, 0.05)'
-              : 'rgba(255, 255, 255, 0.02)';
+              : 'var(--surface-subtle)';
 
             return (
               <div

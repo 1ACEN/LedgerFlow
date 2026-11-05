@@ -30,18 +30,7 @@ export const ScenarioMatrixCard = ({ scenarios }: ScenarioMatrixCardProps) => {
           }}
         >
           {/* Card 1: Worst-Case Scenario */}
-          <div
-            style={{
-              padding: '18px 20px',
-              background: 'linear-gradient(180deg, rgba(38, 20, 26, 0.65) 0%, rgba(20, 12, 16, 0.85) 100%)',
-              border: '1px solid rgba(244, 63, 94, 0.28)',
-              borderRadius: 'var(--radius-md)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 10,
-              boxShadow: 'inset 0 1px 0 0 rgba(244, 63, 94, 0.15)',
-            }}
-          >
+          <div className="scenario-card worst">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: '#fb7185' }}>
                 Worst-Case (P10)
@@ -60,7 +49,7 @@ export const ScenarioMatrixCard = ({ scenarios }: ScenarioMatrixCardProps) => {
               </div>
             </div>
 
-            <div style={{ borderTop: '1px solid rgba(244, 63, 94, 0.15)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-muted)' }}>90D Ending Cash:</span>
                 <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontFamily: "'JetBrains Mono', monospace" }}>
@@ -81,23 +70,12 @@ export const ScenarioMatrixCard = ({ scenarios }: ScenarioMatrixCardProps) => {
           </div>
 
           {/* Card 2: Base-Case Scenario */}
-          <div
-            style={{
-              padding: '18px 20px',
-              background: 'linear-gradient(180deg, rgba(20, 28, 48, 0.65) 0%, rgba(13, 18, 32, 0.85) 100%)',
-              border: '1px solid rgba(59, 130, 246, 0.35)',
-              borderRadius: 'var(--radius-md)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 10,
-              boxShadow: 'inset 0 1px 0 0 rgba(59, 130, 246, 0.2)',
-            }}
-          >
+          <div className="scenario-card base">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: '#60a5fa' }}>
                 Base-Case (P50)
               </span>
-              <span className="badge-pill" style={{ background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.3)', color: '#93c5fd', fontSize: 10 }}>
+              <span className="badge-pill med" style={{ fontSize: 10 }}>
                 Expected Median
               </span>
             </div>
@@ -111,7 +89,7 @@ export const ScenarioMatrixCard = ({ scenarios }: ScenarioMatrixCardProps) => {
               </div>
             </div>
 
-            <div style={{ borderTop: '1px solid rgba(59, 130, 246, 0.15)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-muted)' }}>90D Ending Cash:</span>
                 <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontFamily: "'JetBrains Mono', monospace" }}>
@@ -132,18 +110,7 @@ export const ScenarioMatrixCard = ({ scenarios }: ScenarioMatrixCardProps) => {
           </div>
 
           {/* Card 3: Best-Case Scenario */}
-          <div
-            style={{
-              padding: '18px 20px',
-              background: 'linear-gradient(180deg, rgba(18, 36, 28, 0.65) 0%, rgba(12, 22, 18, 0.85) 100%)',
-              border: '1px solid rgba(16, 185, 129, 0.32)',
-              borderRadius: 'var(--radius-md)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 10,
-              boxShadow: 'inset 0 1px 0 0 rgba(16, 185, 129, 0.18)',
-            }}
-          >
+          <div className="scenario-card best">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: '#34d399' }}>
                 Best-Case (P90)
@@ -162,7 +129,7 @@ export const ScenarioMatrixCard = ({ scenarios }: ScenarioMatrixCardProps) => {
               </div>
             </div>
 
-            <div style={{ borderTop: '1px solid rgba(16, 185, 129, 0.15)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-muted)' }}>90D Ending Cash:</span>
                 <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontFamily: "'JetBrains Mono', monospace" }}>

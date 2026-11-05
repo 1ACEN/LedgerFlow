@@ -46,7 +46,7 @@ export const RetryAdvisorTable: React.FC<RetryAdvisorTableProps> = ({ rows }) =>
         {/* Filter Controls */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Filter probability:</span>
-          <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.04)', borderRadius: 'var(--radius-sm)', padding: 3, border: '1px solid var(--border)' }}>
+          <div className="filter-group">
             <button
               className={`filter-btn ${minProb === 0 ? 'active' : ''}`}
               onClick={() => setMinProb(0)}
@@ -147,7 +147,7 @@ export const RetryAdvisorTable: React.FC<RetryAdvisorTableProps> = ({ rows }) =>
             </tbody>
             {filteredRows.length > 0 && (
               <tfoot>
-                <tr style={{ background: 'rgba(12,16,25,0.85)', borderTop: '1px solid var(--border)' }}>
+                <tr style={{ background: 'var(--table-th-bg)', borderTop: '1px solid var(--border)' }}>
                   <td colSpan={7} style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
                     Total Recoverable Pipeline ({filteredRows.length} transactions):
                   </td>

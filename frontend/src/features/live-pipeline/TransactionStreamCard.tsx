@@ -119,7 +119,7 @@ export const TransactionStreamCard: React.FC<TransactionStreamCardProps> = ({
                           fontWeight: 600,
                           padding: '2px 7px',
                           borderRadius: 4,
-                          background: 'rgba(255, 255, 255, 0.05)',
+                          background: 'var(--pill-bg)',
                           color: 'var(--text-secondary)',
                           textTransform: 'uppercase',
                         }}

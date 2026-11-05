@@ -172,13 +172,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({ refreshKey }) => {
       )}
 
       {/* 4. Deep-Dive Treasury & Cash Movement Exploratory Section */}
-      <div
-        className="card animate-in stagger-3"
-        style={{
-          marginTop: 6,
-          background: 'rgba(14, 19, 32, 0.65)',
-        }}
-      >
+      <div className="card animate-in stagger-3" style={{ marginTop: 6 }}>
         <div
           className="card-header"
           style={{
@@ -200,17 +194,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({ refreshKey }) => {
           </div>
 
           {/* Segmented View Switcher */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              background: 'rgba(255, 255, 255, 0.04)',
-              padding: 3,
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--border)',
-            }}
-          >
+          <div className="filter-group">
             <button
               className={`filter-btn ${deepDiveView === 'all' ? 'active' : ''}`}
               onClick={() => setDeepDiveView('all')}

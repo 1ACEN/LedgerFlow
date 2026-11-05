@@ -94,7 +94,7 @@ export const AnomalyDetectionCard = ({
                   {anom.description}
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, marginTop: 2, borderTop: '1px solid rgba(255, 255, 255, 0.04)', paddingTop: 6 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, marginTop: 2, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
                   <span style={{ color: 'var(--text-muted)' }}>
                     Affected Rail: <strong style={{ color: 'var(--text-primary)' }}>{anom.affected_rail}</strong>
                   </span>

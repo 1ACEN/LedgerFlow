@@ -48,15 +48,7 @@ export const ExecutiveKpiStrip: React.FC<ExecutiveKpiStripProps> = ({ kpis, load
       {/* 4 Large Hero Command Center KPI Cards */}
       <div className="grid-4" style={{ marginBottom: 0 }}>
         {/* Hero Card 1: Total Revenue */}
-        <div
-          className="metric-card animate-in stagger-1"
-          style={{
-            padding: '22px 24px',
-            background: 'linear-gradient(180deg, rgba(22, 34, 56, 0.75) 0%, rgba(14, 20, 35, 0.9) 100%)',
-            border: '1px solid rgba(59, 130, 246, 0.22)',
-            boxShadow: 'inset 0 1px 0 0 rgba(59, 130, 246, 0.15), var(--shadow-card)',
-          }}
-        >
+        <div className="metric-card accent-blue animate-in stagger-1" style={{ padding: '22px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span className="metric-label" style={{ color: 'var(--text-secondary)' }}>
               Total Revenue (30D)
@@ -90,15 +82,7 @@ export const ExecutiveKpiStrip: React.FC<ExecutiveKpiStripProps> = ({ kpis, load
         </div>
 
         {/* Hero Card 2: Total Expenses */}
-        <div
-          className="metric-card animate-in stagger-2"
-          style={{
-            padding: '22px 24px',
-            background: 'linear-gradient(180deg, rgba(38, 22, 32, 0.75) 0%, rgba(20, 14, 22, 0.9) 100%)',
-            border: '1px solid rgba(244, 63, 94, 0.22)',
-            boxShadow: 'inset 0 1px 0 0 rgba(244, 63, 94, 0.15), var(--shadow-card)',
-          }}
-        >
+        <div className="metric-card accent-red animate-in stagger-2" style={{ padding: '22px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span className="metric-label" style={{ color: 'var(--text-secondary)' }}>
               Total Expenses (30D)
@@ -132,15 +116,7 @@ export const ExecutiveKpiStrip: React.FC<ExecutiveKpiStripProps> = ({ kpis, load
         </div>
 
         {/* Hero Card 3: Net Profit */}
-        <div
-          className="metric-card animate-in stagger-3"
-          style={{
-            padding: '22px 24px',
-            background: 'linear-gradient(180deg, rgba(18, 38, 32, 0.75) 0%, rgba(13, 24, 20, 0.9) 100%)',
-            border: '1px solid rgba(16, 185, 129, 0.24)',
-            boxShadow: 'inset 0 1px 0 0 rgba(16, 185, 129, 0.15), var(--shadow-card)',
-          }}
-        >
+        <div className="metric-card accent-green animate-in stagger-3" style={{ padding: '22px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span className="metric-label" style={{ color: 'var(--text-secondary)' }}>
               Net Profit (30D)
@@ -174,15 +150,7 @@ export const ExecutiveKpiStrip: React.FC<ExecutiveKpiStripProps> = ({ kpis, load
         </div>
 
         {/* Hero Card 4: Cash Balance */}
-        <div
-          className="metric-card animate-in stagger-4"
-          style={{
-            padding: '22px 24px',
-            background: 'linear-gradient(180deg, rgba(25, 30, 48, 0.75) 0%, rgba(14, 18, 30, 0.9) 100%)',
-            border: '1px solid rgba(99, 102, 241, 0.22)',
-            boxShadow: 'inset 0 1px 0 0 rgba(99, 102, 241, 0.15), var(--shadow-card)',
-          }}
-        >
+        <div className="metric-card accent-purple animate-in stagger-4" style={{ padding: '22px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span className="metric-label" style={{ color: 'var(--text-secondary)' }}>
               Cash Balance
@@ -219,20 +187,7 @@ export const ExecutiveKpiStrip: React.FC<ExecutiveKpiStripProps> = ({ kpis, load
       </div>
 
       {/* Secondary Strategic Telemetry Bar */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-          gap: 12,
-          padding: '12px 18px',
-          background: 'rgba(14, 19, 31, 0.75)',
-          borderRadius: 'var(--radius-md)',
-          border: '1px solid var(--border)',
-          fontSize: 12,
-          color: 'var(--text-secondary)',
-          backdropFilter: 'blur(10px)',
-        }}
-      >
+      <div className="telemetry-strip">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ color: 'var(--text-muted)' }}>Net Cash Flow (30D):</span>
           <span

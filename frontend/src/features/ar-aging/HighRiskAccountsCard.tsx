@@ -83,8 +83,8 @@ export default function HighRiskAccountsCard({ accounts }: Props) {
               <div
                 key={acc.customer_id}
                 style={{
-                  background: 'rgba(255, 255, 255, 0.02)',
-                  border: `1px solid ${isCritical ? 'rgba(244, 63, 94, 0.25)' : 'rgba(255, 255, 255, 0.06)'}`,
+                  background: 'var(--surface-subtle)',
+                  border: `1px solid ${isCritical ? 'rgba(244, 63, 94, 0.25)' : 'var(--border)'}`,
                   borderLeft: `4px solid ${isCritical ? '#f43f5e' : '#f59e0b'}`,
                   borderRadius: 6,
                   padding: '12px 14px',
@@ -102,7 +102,7 @@ export default function HighRiskAccountsCard({ accounts }: Props) {
                       width: 24,
                       height: 24,
                       borderRadius: '50%',
-                      background: 'rgba(255, 255, 255, 0.06)',
+                      background: 'var(--pill-bg)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -124,7 +124,7 @@ export default function HighRiskAccountsCard({ accounts }: Props) {
                           fontWeight: 700,
                           padding: '1px 5px',
                           borderRadius: 3,
-                          background: 'rgba(255, 255, 255, 0.08)',
+                          background: 'var(--pill-bg)',
                           color: 'var(--text-secondary)',
                         }}
                       >
@@ -194,9 +194,9 @@ export default function HighRiskAccountsCard({ accounts }: Props) {
                         padding: '5px 10px',
                         fontSize: 11,
                         fontWeight: 600,
-                        background: 'rgba(255, 255, 255, 0.05)',
+                        background: 'var(--pill-bg)',
                         color: 'var(--text-secondary)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        border: '1px solid var(--border)',
                         borderRadius: 4,
                         cursor: 'pointer',
                         transition: 'all 0.15s ease',

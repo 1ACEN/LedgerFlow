@@ -33,7 +33,7 @@ export const DebtCapitalStructureCard = ({
           <div
             style={{
               padding: '12px 14px',
-              background: 'rgba(255, 255, 255, 0.025)',
+              background: 'var(--surface-subtle)',
               border: '1px solid var(--border)',
               borderRadius: 'var(--radius-sm)',
             }}
@@ -52,7 +52,7 @@ export const DebtCapitalStructureCard = ({
           <div
             style={{
               padding: '12px 14px',
-              background: 'rgba(255, 255, 255, 0.025)',
+              background: 'var(--surface-subtle)',
               border: '1px solid var(--border)',
               borderRadius: 'var(--radius-sm)',
             }}
@@ -71,7 +71,7 @@ export const DebtCapitalStructureCard = ({
           <div
             style={{
               padding: '12px 14px',
-              background: 'rgba(255, 255, 255, 0.025)',
+              background: 'var(--surface-subtle)',
               border: '1px solid var(--border)',
               borderRadius: 'var(--radius-sm)',
             }}
@@ -90,7 +90,7 @@ export const DebtCapitalStructureCard = ({
           <div
             style={{
               padding: '12px 14px',
-              background: 'rgba(255, 255, 255, 0.025)',
+              background: 'var(--surface-subtle)',
               border: '1px solid var(--border)',
               borderRadius: 'var(--radius-sm)',
             }}

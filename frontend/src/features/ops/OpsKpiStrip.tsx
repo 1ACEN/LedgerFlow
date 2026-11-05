@@ -34,15 +34,7 @@ export const OpsKpiStrip = ({ kpis, loading }: OpsKpiStripProps) => {
         }}
       >
         {/* Card 1: System Health & Anomaly Index */}
-        <div
-          className="metric-card animate-in stagger-1"
-          style={{
-            padding: '20px 22px',
-            background: 'linear-gradient(180deg, rgba(20, 36, 48, 0.75) 0%, rgba(12, 22, 32, 0.9) 100%)',
-            border: '1px solid rgba(14, 165, 233, 0.28)',
-            boxShadow: 'inset 0 1px 0 0 rgba(14, 165, 233, 0.15), var(--shadow-sm)',
-          }}
-        >
+        <div className="metric-card accent-cyan animate-in stagger-1" style={{ padding: '20px 22px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="metric-label" style={{ color: 'var(--text-secondary)' }}>
               Operational Health Index
@@ -72,15 +64,7 @@ export const OpsKpiStrip = ({ kpis, loading }: OpsKpiStripProps) => {
         </div>
 
         {/* Card 2: Authorization Success Rate */}
-        <div
-          className="metric-card animate-in stagger-2"
-          style={{
-            padding: '20px 22px',
-            background: 'linear-gradient(180deg, rgba(18, 36, 28, 0.75) 0%, rgba(12, 22, 18, 0.9) 100%)',
-            border: '1px solid rgba(16, 185, 129, 0.24)',
-            boxShadow: 'inset 0 1px 0 0 rgba(16, 185, 129, 0.15), var(--shadow-sm)',
-          }}
-        >
+        <div className="metric-card accent-green animate-in stagger-2" style={{ padding: '20px 22px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="metric-label" style={{ color: 'var(--text-secondary)' }}>
               Global Auth Rate
@@ -110,15 +94,7 @@ export const OpsKpiStrip = ({ kpis, loading }: OpsKpiStripProps) => {
         </div>
 
         {/* Card 3: Processed Volume & Throughput */}
-        <div
-          className="metric-card animate-in stagger-3"
-          style={{
-            padding: '20px 22px',
-            background: 'linear-gradient(180deg, rgba(20, 28, 48, 0.75) 0%, rgba(13, 18, 32, 0.9) 100%)',
-            border: '1px solid rgba(59, 130, 246, 0.22)',
-            boxShadow: 'inset 0 1px 0 0 rgba(59, 130, 246, 0.15), var(--shadow-sm)',
-          }}
-        >
+        <div className="metric-card accent-blue animate-in stagger-3" style={{ padding: '20px 22px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="metric-label" style={{ color: 'var(--text-secondary)' }}>
               Total Processed Volume
@@ -148,15 +124,7 @@ export const OpsKpiStrip = ({ kpis, loading }: OpsKpiStripProps) => {
         </div>
 
         {/* Card 4: AI Smart Recovery Expected */}
-        <div
-          className="metric-card animate-in stagger-4"
-          style={{
-            padding: '20px 22px',
-            background: 'linear-gradient(180deg, rgba(28, 22, 45, 0.75) 0%, rgba(18, 14, 30, 0.9) 100%)',
-            border: '1px solid rgba(139, 92, 246, 0.24)',
-            boxShadow: 'inset 0 1px 0 0 rgba(139, 92, 246, 0.15), var(--shadow-sm)',
-          }}
-        >
+        <div className="metric-card accent-purple animate-in stagger-4" style={{ padding: '20px 22px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="metric-label" style={{ color: 'var(--text-secondary)' }}>
               AI Predicted Recovery
@@ -186,15 +154,7 @@ export const OpsKpiStrip = ({ kpis, loading }: OpsKpiStripProps) => {
         </div>
 
         {/* Card 5: Disputes & Risk Exposure */}
-        <div
-          className="metric-card animate-in stagger-4"
-          style={{
-            padding: '20px 22px',
-            background: 'linear-gradient(180deg, rgba(35, 28, 20, 0.75) 0%, rgba(22, 17, 13, 0.9) 100%)',
-            border: '1px solid rgba(245, 158, 11, 0.22)',
-            boxShadow: 'inset 0 1px 0 0 rgba(245, 158, 11, 0.15), var(--shadow-sm)',
-          }}
-        >
+        <div className="metric-card accent-yellow animate-in stagger-4" style={{ padding: '20px 22px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="metric-label" style={{ color: 'var(--text-secondary)' }}>
               Dispute Exposure
@@ -225,20 +185,7 @@ export const OpsKpiStrip = ({ kpis, loading }: OpsKpiStripProps) => {
       </div>
 
       {/* AI Operations Console Telemetry Strip */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-          gap: 12,
-          padding: '12px 18px',
-          background: 'rgba(14, 19, 31, 0.75)',
-          borderRadius: 'var(--radius-md)',
-          border: '1px solid var(--border)',
-          fontSize: 12,
-          color: 'var(--text-secondary)',
-          backdropFilter: 'blur(10px)',
-        }}
-      >
+      <div className="telemetry-strip">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ color: 'var(--text-muted)' }}>Workflow Automation:</span>
           <span style={{ fontWeight: 700, color: 'var(--green)', fontFamily: "'JetBrains Mono', monospace" }}>
