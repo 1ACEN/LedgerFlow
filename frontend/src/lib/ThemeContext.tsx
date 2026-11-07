@@ -37,19 +37,18 @@ const STORAGE_KEY = 'ledgerflow-theme';
 
 function getInitialTheme(): Theme {
   try {
+    if (typeof window !== 'undefined') {
+      const q = new URLSearchParams(window.location.search).get('theme');
+      if (q === 'light' || q === 'dark') return q;
+    }
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved === 'light' || saved === 'dark') {
       return saved;
     }
-    if (typeof window !== 'undefined' && window.matchMedia) {
-      if (window.matchMedia('(prefers-color-scheme: light)').matches) {
-        return 'light';
-      }
-    }
   } catch {
     // ignore local storage restrictions in sandboxed iframes
   }
-  return 'dark'; // default to LedgerFlow dark observability mode
+  return 'light'; // default start on Day side toggle
 }
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

@@ -14,6 +14,17 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
+    <script>
+      (function() {
+        try {
+          var p = new URLSearchParams(window.location.search).get('theme');
+          var s = localStorage.getItem('ledgerflow-theme');
+          var t = (p === 'light' || p === 'dark') ? p : (s === 'light' || s === 'dark') ? s : 'light';
+          document.documentElement.setAttribute('data-theme', t);
+          document.documentElement.style.colorScheme = t;
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -113,23 +113,6 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({ refreshKey }) => {
             <span className="demo-dot" />
             <span>Live Telemetry</span>
           </div>
-          <button
-            className="refresh-btn"
-            onClick={refetch}
-            disabled={loading}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              fontSize: 12,
-              padding: '6px 14px',
-            }}
-          >
-            <span style={{ display: 'inline-block', transform: loading ? 'rotate(180deg)' : 'none', transition: 'transform 0.5s' }}>
-              ↻
-            </span>
-            <span>{loading ? 'Syncing...' : 'Refresh'}</span>
-          </button>
         </div>
       </div>
 

@@ -94,6 +94,17 @@ CREATE TABLE IF NOT EXISTS merchants (
     is_active           BOOLEAN DEFAULT TRUE
 );
 
+-- Authentication & User Access
+CREATE TABLE IF NOT EXISTS users (
+    user_id             VARCHAR PRIMARY KEY,
+    username            VARCHAR UNIQUE NOT NULL,
+    password_hash       VARCHAR NOT NULL,
+    salt                VARCHAR NOT NULL,
+    full_name           VARCHAR NOT NULL,
+    role_id             VARCHAR NOT NULL,
+    created_at          TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 -- =============================================================================
 -- ML TABLES
 -- =============================================================================

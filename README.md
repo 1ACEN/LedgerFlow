@@ -18,6 +18,9 @@ LedgerFlow ingests transactions from Stripe and bank feeds (via Plaid), normalis
 | Layer | Capability |
 |---|---|
 | **Ingestion** | Stripe webhooks + Plaid bank feeds → normalised transaction ledger |
+| **Authentication & RBAC** | Enterprise role gateway with 5 position clearances, session persistence, and scoped page visibility |
+| **Navigation & Shell** | Slide-out drawer navigation (role-filtered, zero lock icons) with 64px minimalist top bar & single unified refresh |
+| **Telemetry Transitions** | Theme-reactive 1s traversing & rising line chart loading box on site entry and page switches |
 | **Live Pipeline** | Real-time streaming feed, manual transaction entry, gateway/webhook health |
 | **Fintech Ops** | Payment success rates, decline-code analysis, AI retry advisor, payout tracking, dispute monitoring |
 | **Cash Flow** | Daily net position, 13-week forecast with ML prediction intervals (P10/P50/P90), AR aging |
@@ -216,18 +219,25 @@ ledgerflow/
 │   └── crontab                         # Cron schedules (nightly ingest, weekly retrain)
 │
 ├── frontend/                           # React 18 + TypeScript + Vite SPA
+│   ├── public/                         # Static assets (emblem icon, full logo)
 │   ├── src/
 │   │   ├── components/                 # Shared UI components
-│   │   ├── features/                   # 6 Dashboard tabs:
+│   │   │   ├── LoadingBox.tsx          # 1s traversing & rising line chart loading box
+│   │   │   ├── LoadingBox.css          # Day/Night theme-reactive transition styling
+│   │   │   ├── Sidebar.tsx             # Slide-out drawer navigation & profile card
+│   │   │   ├── Sidebar.css             # Architectural, non-AI-gradient drawer styling
+│   │   │   └── ThemeToggle.tsx         # Day / Night mode toggle switch
+│   │   ├── features/                   # Feature modules:
+│   │   │   ├── auth/                   # Enterprise RBAC gateway (LoginPage, AuthContext, types)
 │   │   │   ├── live-pipeline/          # Real-time transaction ticker & manual entry
 │   │   │   ├── executive/              # Runway, burn rate, cash trajectory
 │   │   │   ├── cashflow/               # 13-week ML forecast fan chart (P10/P50/P90)
 │   │   │   ├── revenue/                # P&L, MoM growth combo, product mix
 │   │   │   ├── ops/                    # Decline analysis & ML retry advisor
 │   │   │   └── ar-aging/               # AR aging buckets & overdue spotlight
-│   │   ├── lib/                        # API client, tab definitions, formatters
-│   │   ├── styles/                     # CSS stylesheets & design tokens
-│   │   ├── App.tsx                     # Main layout shell and tab router
+│   │   ├── lib/                        # API client, tab definitions, formatters, ThemeContext
+│   │   ├── styles/                     # theme.css design tokens & responsive foundations
+│   │   ├── App.tsx                     # Main layout shell, header & drawer orchestration
 │   │   └── main.tsx                    # React entry point
 │   ├── dist/                           # Compiled production bundle (served by FastAPI at /)
 │   ├── package.json
@@ -313,18 +323,49 @@ Copy `.env.example` → `.env` for local development. No API keys are required w
 
 ## Dashboard — Unified View
 
-One dashboard at `http://localhost:8080` with tabbed views covering every finance audience:
+One dashboard at `http://localhost:8080` with role-scoped modular views covering every finance audience:
 
-| Tab | Audience | Data freshness |
-|-----|----------|----------------|
-| Live Pipeline | Payments engineers, risk team | Real-time (webhook-driven) |
-| Executive Overview | CFO, CEO, board | Daily |
-| Cash Flow & Forecast | Treasurer, controller | Daily (nightly cron) |
-| CFO & Revenue | CFO, FP&A | Monthly |
-| Fintech Ops & AI | Payments engineers, risk team | Real-time |
-| AR Aging | Collections / finance | Daily |
+| Tab | Audience | Data freshness | Default Clearance |
+|-----|----------|----------------|-------------------|
+| Live Pipeline | Payments engineers, risk team | Real-time (webhook-driven) | Admin, Executive, Ops |
+| Executive Overview | CFO, CEO, board | Daily | Admin, Executive, CFO, Ops |
+| Cash Flow & Forecast | Treasurer, controller | Daily (nightly cron) | Admin, Executive, CFO, Credit |
+| CFO & Revenue | CFO, FP&A | Monthly | Admin, Executive, CFO |
+| Fintech Ops & AI | Payments engineers, risk team | Real-time | Admin, Ops |
+| AR Aging | Collections / finance | Daily | Admin, CFO, Credit |
 
-It also provides a **manual transaction input form** and a **live streaming feed**, plus a REST API (`/docs` for OpenAPI docs) for webhooks and reports.
+---
+
+## Role-Based Access Control (RBAC), Authentication & Navigation
+
+LedgerFlow features an enterprise-grade authentication gateway backed by DuckDB and cryptographic PBKDF2 HMAC-SHA256 password hashing:
+
+- **Users Database (`scripts/api/auth_db.py`, DuckDB `users` table):**
+  - Manages accounts with per-user salt and 100,000 rounds of PBKDF2 HMAC-SHA256. Constant-time digest verification (`secrets.compare_digest`).
+  - Pre-seeded with initial corporate roles on startup and supports real-time self-registration (`POST /api/auth/signup`).
+  - REST endpoints: `POST /api/auth/login`, `POST /api/auth/signup`, `GET /api/auth/roles`.
+- **Zero-Trust Input & Security:**
+  - Username and password inputs start completely blank by default (`useState('')`) — preventing unintended auto-login or credential leaks on public deployments.
+  - Eliminated the 1-click launch bypass to enforce real credential verification.
+  - Clean segmented control to switch seamlessly between **Sign In** and **Create Account**.
+- **Role Clearances & Permissions:**
+
+| Role ID | Position / Title | Clearance Badge | Accessible Modules | Scope Summary |
+|---------|------------------|-----------------|-------------------|---------------|
+| `admin` | Global System Administrator | **Super Admin** | **All 6 Modules** | Full unrestricted access to all financial intelligence |
+| `executive` | Sarah Chen (CEO) | **Executive** | 4 Modules | Executive Overview, Cash Flow, CFO & Revenue, Live Pipeline |
+| `cfo` | Marcus Vance (CFO) | **CFO / Treasury** | 4 Modules | CFO & Revenue, Cash Flow, AR Aging, Executive Overview |
+| `ops` | Elena Rostova (VP Fintech Ops) | **Fintech Ops** | 3 Modules | Fintech Ops & AI, Live Pipeline, Executive Overview |
+| `credit` | David Sterling (Credit & AR Lead) | **Credit & Risk** | 2 Modules | AR Aging, Cash Flow & Forecast |
+
+*Built-in Seed Accounts*: The database is pre-seeded with: `admin`/`admin`, `executive`/`exec`, `cfo`/`cfo`, `ops`/`ops`, `credit`/`credit`. Users can also create new custom accounts with their chosen clearance directly via the **Create Account** tab.
+
+### UI/UX Pro Max Design System
+- **Restrained Architectural Night Mode**: Stripped out distracting neon radial glow bloat and rainbow gradient washes in favor of calm, solid obsidian (`#080B11` / `#101522`), crisp 1px borders, and solid enterprise action buttons (`#2563EB`).
+- **Default Day Mode**: Defaults to clean day mode with crisp slate surfaces and high-contrast typography.
+- **Left Slide-out Drawer**: Accessible via the header hamburger button (`☰`). Filters and displays **strictly the accessible modules** for the active position. Zero lock icons or visual clutter.
+- **Minimalist Top Bar**: Houses strictly the hamburger trigger, official emblem icon & title, live stream status (`• Live`), last updated telemetry timestamp, Day/Night toggle switch, and the single unified **Refresh** button.
+- **1-Second Dynamic Line Chart Transition**: Whenever switching modules or entering the application, an animated SVG line chart traverses forward and rises to a peak with cyan-blue-indigo gradients and theme-reactive glassmorphism.
 
 ---
 

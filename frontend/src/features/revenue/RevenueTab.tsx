@@ -146,24 +146,6 @@ export default function RevenueTab({ refreshKey }: Props) {
             <span className="demo-dot" />
             <span>Accrual P&amp;L Active</span>
           </div>
-
-          <button
-            className="refresh-btn"
-            onClick={refetch}
-            disabled={loading}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              fontSize: 12,
-              padding: '6px 14px',
-            }}
-          >
-            <span style={{ display: 'inline-block', transform: loading ? 'rotate(180deg)' : 'none', transition: 'transform 0.5s' }}>
-              ↻
-            </span>
-            <span>{loading ? 'Auditing...' : 'Sync Ledger'}</span>
-          </button>
         </div>
       </div>
 

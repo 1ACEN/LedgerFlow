@@ -158,16 +158,6 @@ export default function ArAgingTab({ refreshKey }: Props) {
               Customer Ledger
             </button>
           </div>
-
-          <button
-            className="refresh-btn"
-            onClick={refetch}
-            title="Re-query Accounts Receivable Ledger"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 12px', fontSize: 12 }}
-          >
-            <span>↻</span>
-            <span>Refresh</span>
-          </button>
         </div>
       </div>
 

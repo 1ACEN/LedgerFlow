@@ -33,6 +33,11 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from rich.console import Console
 
+from scripts.api.auth_db import (
+    authenticate_user,
+    init_users_table,
+    register_user,
+)
 from scripts.ingestion.common import (
     _date_fields,
     _db_lock,
@@ -114,6 +119,18 @@ class ManualTransaction(BaseModel):
     is_recurring: bool = False
 
 
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class SignupRequest(BaseModel):
+    username: str
+    password: str
+    full_name: str
+    role_id: str = "ops"
+
+
 # =============================================================================
 # STARTUP — seed DB if empty and DEMO_MODE enabled
 # =============================================================================
@@ -128,6 +145,9 @@ async def startup_event():
     try:
         with _db_lock:
             conn = get_conn(DUCKDB_PATH)
+            # Ensure users authentication table exists & is seeded
+            init_users_table(conn)
+
             tables = conn.execute(
                 "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
             ).fetchall()
@@ -352,6 +372,98 @@ app.mount(
     StaticFiles(directory=_FRONTEND_ASSETS),
     name="frontend-assets",
 )
+
+
+# =============================================================================
+# AUTHENTICATION ENDPOINTS
+# =============================================================================
+
+
+@app.post("/api/auth/login")
+def api_login(payload: LoginRequest):
+    """Authenticate a user against the DuckDB users database."""
+    _db_ready.wait(timeout=10.0)
+    with _db_lock:
+        conn = get_conn(DUCKDB_PATH)
+        init_users_table(conn)
+        user = authenticate_user(conn, payload.username, payload.password)
+
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid username or password. Please verify your credentials or register a new account.",
+        )
+    return {"status": "success", "user": user}
+
+
+@app.post("/api/auth/signup", status_code=201)
+def api_signup(payload: SignupRequest):
+    """Register a new user in DuckDB users database."""
+    _db_ready.wait(timeout=10.0)
+    with _db_lock:
+        conn = get_conn(DUCKDB_PATH)
+        init_users_table(conn)
+        user, error = register_user(
+            conn,
+            username=payload.username,
+            password=payload.password,
+            full_name=payload.full_name,
+            role_id=payload.role_id,
+        )
+
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+
+    return {"status": "success", "user": user}
+
+
+@app.get("/api/auth/roles")
+def api_get_roles():
+    """Return available roles and permission metadata for registration."""
+    return {
+        "roles": [
+            {
+                "id": "admin",
+                "label": "Administrator",
+                "badge": "Super Admin",
+                "color": "#38bdf8",
+                "pagesCount": 6,
+                "description": "Unrestricted full access across all financial, ops, credit, and audit systems",
+            },
+            {
+                "id": "executive",
+                "label": "Executive / Board",
+                "badge": "Executive",
+                "color": "#a855f7",
+                "pagesCount": 4,
+                "description": "High-level summary, burn rate, runway, executive briefings, and board decks",
+            },
+            {
+                "id": "cfo",
+                "label": "CFO / Finance",
+                "badge": "CFO / Treasury",
+                "color": "#3b82f6",
+                "pagesCount": 4,
+                "description": "Cash position, 13-week runway forecast, working capital, and treasury operations",
+            },
+            {
+                "id": "ops",
+                "label": "Operations / Billing",
+                "badge": "Fintech Ops",
+                "color": "#10b981",
+                "pagesCount": 3,
+                "description": "Revenue stream breakdown, real-time live transaction feed, and settlement metrics",
+            },
+            {
+                "id": "credit",
+                "label": "Credit & Risk Analyst",
+                "badge": "Credit & Risk",
+                "color": "#f59e0b",
+                "pagesCount": 2,
+                "description": "AR aging buckets, DSO trajectory, high-exposure counterparty risk monitoring",
+            },
+        ]
+    }
 
 
 # =============================================================================
