@@ -175,4 +175,3 @@ def register_user(
         },
         None,
     )
-

@@ -114,11 +114,14 @@ class TestAuthAPIEndpoints:
         assert res.status_code == 401
 
     def test_api_login_unknown_user(self):
-        res = self.client.post("/api/auth/login", json={"username": "nonexistent_user", "password": "any"})
+        res = self.client.post(
+            "/api/auth/login", json={"username": "nonexistent_user", "password": "any"}
+        )
         assert res.status_code == 401
 
     def test_api_signup_flow(self):
         import uuid
+
         unique_name = f"user_{uuid.uuid4().hex[:6]}"
         res = self.client.post(
             "/api/auth/signup",
@@ -141,4 +144,3 @@ class TestAuthAPIEndpoints:
         )
         assert login_res.status_code == 200
         assert login_res.json()["user"]["username"] == unique_name
-
