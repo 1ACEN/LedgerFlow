@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # LedgerFlow application container
   app:
@@ -11,7 +9,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - DUCKDB_PATH=/data/ledgerflow.duckdb
+      - DATABASE_URL=${DATABASE_URL:-postgresql://ledgerflow:ledgerflow@postgres:5432/ledgerflow}
       - MODEL_REGISTRY_PATH=/models/
       - GENERATE_SYNTHETIC=true
       - DEMO_MODE=${DEMO_MODE:-true}
@@ -23,8 +21,10 @@ services:
       - PLAID_SECRET=${PLAID_SECRET:-}
       - PLAID_ENV=${PLAID_ENV:-sandbox}
       - PLAID_ACCESS_TOKENS=${PLAID_ACCESS_TOKENS:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
     volumes:
-      - ledgerflow_data:/data
       - ledgerflow_models:/models
       - ./scripts:/app/scripts:ro
     restart: unless-stopped
@@ -35,25 +35,24 @@ services:
       retries: 3
       start_period: 15s
 
-  # Optional: PostgreSQL for production-like testing
-  # postgres:
-  #   image: postgres:16-alpine
-  #   container_name: ledgerflow-postgres
-  #   environment:
-  #     POSTGRES_DB: ledgerflow
-  #     POSTGRES_USER: ledgerflow
-  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ledgerflow}
-  #   ports:
-  #     - "5432:5432"
-  #   volumes:
-  #     - ledgerflow_pgdata:/var/lib/postgresql/data
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U ledgerflow"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
+  # Local/Container PostgreSQL 16 (exposed on 5433 to avoid conflict with local Postgres on 5432)
+  postgres:
+    image: postgres:16-alpine
+    container_name: ledgerflow-postgres
+    environment:
+      POSTGRES_DB: ledgerflow
+      POSTGRES_USER: ledgerflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ledgerflow}
+    ports:
+      - "5433:5432"
+    volumes:
+      - ledgerflow_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ledgerflow -d ledgerflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
-  ledgerflow_data:
   ledgerflow_models:
-  # ledgerflow_pgdata:
+  ledgerflow_pgdata:

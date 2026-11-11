@@ -27,7 +27,7 @@ help:
 
 # Start the unified dashboard (single merged FastAPI app on port 8080)
 dev:
-	@uv run python -c "import pathlib, shutil; (e := pathlib.Path('.env')).exists() or shutil.copy('.env.example', e); (d := pathlib.Path('data/ledgerflow.duckdb')).exists() or __import__('subprocess').run(['uv', 'run', 'python', 'scripts/utils/generate_synthetic.py', '--rows', '5000', '--output', 'data/ledgerflow.duckdb'])"
+	@uv run python -c "import pathlib, shutil; (e := pathlib.Path('.env')).exists() or shutil.copy('.env.example', e)"
 	@echo "Starting LedgerFlow dashboard on http://localhost:8080"
 	@echo "Press Ctrl+C to stop"
 	uv run uvicorn scripts.api.webhooks:app --host 0.0.0.0 --port 8080 --reload
@@ -55,22 +55,22 @@ web-install:
 web-test:
 	cd frontend && npm test
 
-# Seed (or re-seed) the DuckDB with synthetic data
+# Seed (or re-seed) PostgreSQL with synthetic data
 seed:
-	@echo "Seeding LedgerFlow DuckDB with synthetic data..."
-	uv run python scripts/utils/generate_synthetic.py --rows 50000 --output data/ledgerflow.duckdb
+	@echo "Seeding LedgerFlow PostgreSQL with synthetic data..."
+	uv run python -m scripts.utils.generate_synthetic --rows 50000
 
 # Generate synthetic data for local development
 generate-data:
 	@echo "Generating synthetic transaction data..."
-	uv run python scripts/utils/generate_synthetic.py --rows 50000 --output data/ledgerflow.duckdb
+	uv run python -m scripts.utils.generate_synthetic --rows 50000
 
 # Train ML models
 train:
 	@echo "Training cash flow forecast model (quantile regression)..."
-	uv run python scripts/ml/train_forecast.py --db data/ledgerflow.duckdb --output models/cash_forecast.joblib
+	uv run python -m scripts.ml.train_forecast --output models/cash_forecast.joblib
 	@echo "Training decline retry advisor model..."
-	uv run python scripts/ml/train_retry.py --db data/ledgerflow.duckdb --output models/decline_retry.joblib
+	uv run python -m scripts.ml.train_retry --output models/decline_retry.joblib
 
 # =============================================================================
 # TESTING & QUALITY
@@ -108,17 +108,25 @@ deploy:
 # DATABASE & MIGRATIONS
 # =============================================================================
 
+db-up:
+	@echo "Starting PostgreSQL 16 via Docker Compose (port 5433)..."
+	docker compose up -d postgres
+
 db-init:
-	@echo "Initializing DuckDB schema..."
-	uv run python scripts/db/init_db.py --db data/ledgerflow.duckdb
+	@echo "Initializing PostgreSQL schema..."
+	uv run python -m scripts.db.init_db
 
 db-migrate:
-	@echo "Running migrations..."
-	uv run python scripts/db/migrate.py --db data/ledgerflow.duckdb
+	@echo "Running PostgreSQL migrations..."
+	uv run python -m scripts.db.migrate
 
 db-reconcile:
 	@echo "Running nightly reconciliation..."
-	uv run python scripts/ingestion/reconcile.py --db data/ledgerflow.duckdb
+	uv run python -m scripts.ingestion.reconcile
+
+db-import-duckdb:
+	@echo "Migrating legacy DuckDB file into PostgreSQL..."
+	uv run python -m scripts.db.migrate_duckdb_to_postgres --source data/ledgerflow.duckdb
 
 # =============================================================================
 # UTILITIES
@@ -126,7 +134,6 @@ db-reconcile:
 
 clean:
 	@echo "Cleaning generated files..."
-	rm -rf data/ledgerflow.duckdb
 	rm -rf models/*.joblib
 	rm -rf .pytest_cache
 	rm -rf __pycache__

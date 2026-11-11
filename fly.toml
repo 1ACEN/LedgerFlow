@@ -11,7 +11,6 @@ primary_region = "iad"
   WEBHOOK_PORT = "8080"
   DEMO_MODE = "false"
   PYTHONUNBUFFERED = "1"
-  DUCKDB_PATH = "/data/ledgerflow.duckdb"
   MODEL_REGISTRY_PATH = "/models/"
 
 # HTTP service - Unified LedgerFlow dashboard (FastAPI)
@@ -68,5 +67,5 @@ primary_region = "iad"
 
 # Release command (runs before new version gets traffic)
 [deploy]
-  release_command = "python scripts/db/migrate.py --db $DUCKDB_PATH"
+  release_command = "python -m scripts.db.migrate"
   strategy = "rolling"

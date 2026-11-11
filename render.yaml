@@ -12,7 +12,7 @@ services:
         value: "true"
       - key: GENERATE_SYNTHETIC
         value: "true"
-      - key: DUCKDB_PATH
-        value: /data/ledgerflow.duckdb
+      - key: DATABASE_URL
+        sync: false # Set to Neon / Supabase / Render PostgreSQL URL in Render dashboard
       - key: MODEL_REGISTRY_PATH
         value: /models/

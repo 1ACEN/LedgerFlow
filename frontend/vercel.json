@@ -2,6 +2,10 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://ledgerflow.onrender.com/api/:path*"
+    },
+    {
       "source": "/reports/:path*",
       "destination": "https://ledgerflow.onrender.com/reports/:path*"
     },

@@ -58,9 +58,9 @@ LedgerFlow ingests transactions from Stripe and bank feeds (via Plaid), normalis
 ```
 
 **Key design decisions:**
-- **DuckDB** — embedded OLAP engine; no separate database server required locally
-- **Polars** — fast in-process DataFrame transforms before writing to DuckDB
-- **Unified FastAPI & React architecture** — single FastAPI service serves live streaming feeds, manual transaction entry, webhooks, analytics endpoints, and the compiled modern React SPA from the same origin (with classic self-contained fallback at `/legacy`)
+- **PostgreSQL 16 (`psycopg[binary,pool]`)** — persistent, concurrent transactional & analytical ledger with `GENERATED ALWAYS ... STORED` columns, native `JSONB`, multi-schema views (`public`, `analytics`, `ml`), and direct Power BI `DirectQuery` / `Import` compatibility
+- **Polars + PostgreSQL `COPY`** — fast in-process DataFrame transforms streamed cleanly into Postgres via `TEMP TABLE` + `COPY FROM STDIN` + `ON CONFLICT` upserts
+- **Unified FastAPI & React architecture** — single FastAPI service serves live streaming feeds, manual transaction entry, webhooks, analytics endpoints, and the compiled modern React SPA from the same origin
 - **React 18 + TypeScript + Vite** — modular component-based frontend with Chart.js visualization for all 6 financial operations tabs
 - **uv** — fast, reproducible Python dependency management
 
@@ -121,8 +121,8 @@ make train
 make help            # Show this list
 
 # Development
-make dev             # Generate data + start unified dashboard (port 8080)
-make generate-data   # Generate 50k synthetic transactions into DuckDB
+make dev             # Start unified dashboard (port 8080) backed by PostgreSQL
+make generate-data   # Generate 50k synthetic transactions into PostgreSQL
 make train           # Train both ML models
 
 # Frontend (React / Vite)
@@ -137,10 +137,12 @@ make test-python     # Run Python unit and integration tests
 make lint            # Ruff check & format check
 make typecheck       # mypy type checking
 
-# Database
-make db-init         # Initialise DuckDB schema
-make db-migrate      # Run schema migrations
-make db-reconcile    # Run nightly reconciliation manually
+# Database (PostgreSQL)
+make db-up             # Start local PostgreSQL 16 via Docker Compose (port 5433)
+make db-init           # Initialize PostgreSQL schemas, tables, and views
+make db-migrate        # Run PostgreSQL schema migrations
+make db-reconcile      # Run nightly reconciliation manually
+make db-import-duckdb  # Transfer existing data/ledgerflow.duckdb data into PostgreSQL
 
 # Build & deploy
 make build           # Build multi-stage Docker image
@@ -338,9 +340,9 @@ One dashboard at `http://localhost:8080` with role-scoped modular views covering
 
 ## Role-Based Access Control (RBAC), Authentication & Navigation
 
-LedgerFlow features an enterprise-grade authentication gateway backed by DuckDB and cryptographic PBKDF2 HMAC-SHA256 password hashing:
+LedgerFlow features an enterprise-grade authentication gateway backed by PostgreSQL and cryptographic PBKDF2 HMAC-SHA256 password hashing:
 
-- **Users Database (`scripts/api/auth_db.py`, DuckDB `users` table):**
+- **Users Database (`scripts/api/auth_db.py`, PostgreSQL `users` table):**
   - Manages accounts with per-user salt and 100,000 rounds of PBKDF2 HMAC-SHA256. Constant-time digest verification (`secrets.compare_digest`).
   - Pre-seeded with initial corporate roles on startup and supports real-time self-registration (`POST /api/auth/signup`).
   - REST endpoints: `POST /api/auth/login`, `POST /api/auth/signup`, `GET /api/auth/roles`.
@@ -348,6 +350,20 @@ LedgerFlow features an enterprise-grade authentication gateway backed by DuckDB 
   - Username and password inputs start completely blank by default (`useState('')`) — preventing unintended auto-login or credential leaks on public deployments.
   - Eliminated the 1-click launch bypass to enforce real credential verification.
   - Clean segmented control to switch seamlessly between **Sign In** and **Create Account**.
+
+---
+
+## Connecting Power BI Directly (PostgreSQL Live Data)
+
+Now that LedgerFlow runs on PostgreSQL, Power BI Desktop and Power BI Service can connect directly to the database (no static CSV exports needed):
+
+1. Open **Power BI Desktop → Get Data → Database → PostgreSQL database**.
+2. Enter **Server**: `localhost:5433` (Docker Postgres), `localhost:5432` (native Windows Postgres 18), or your hosted Neon/Supabase/Render Postgres host.
+3. Enter **Database**: `ledgerflow`.
+4. Choose **DirectQuery** (live real-time SQL queries on every slicer/visual interaction) or **Import** (fast cached tables with Scheduled Refresh).
+5. Select core tables and pre-built analytical views:
+   - `public.transactions`, `public.customers`, `public.merchants`
+   - `analytics.daily_cash_position`, `analytics.monthly_pl`, `analytics.revenue_by_product`, `analytics.ar_aging`, `analytics.decline_analysis`, `analytics.forecasts`
 - **Role Clearances & Permissions:**
 
 | Role ID | Position / Title | Clearance Badge | Accessible Modules | Scope Summary |

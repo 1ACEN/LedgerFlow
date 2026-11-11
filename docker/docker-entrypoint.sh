@@ -1,13 +1,13 @@
 #!/bin/bash
 # LedgerFlow Docker Entrypoint
-# Initializes the ledger, then starts cron + the unified FastAPI dashboard
+# Initializes PostgreSQL schema/seed safely, then starts cron + unified FastAPI dashboard
 
 set -e
 
 echo "Starting LedgerFlow container..."
 
-# Ensure target directories exist
-mkdir -p "$(dirname "$DUCKDB_PATH")" "${MODEL_REGISTRY_PATH:-/models/}" 2>/dev/null || true
+# Ensure model directories exist
+mkdir -p "${MODEL_REGISTRY_PATH:-/models/}" 2>/dev/null || true
 
 # Copy fallback pre-trained models if destination is empty
 if [ -d "/app/models" ] && [ ! -f "${MODEL_REGISTRY_PATH:-/models/}/cash_forecast.joblib" ]; then
@@ -15,25 +15,30 @@ if [ -d "/app/models" ] && [ ! -f "${MODEL_REGISTRY_PATH:-/models/}/cash_forecas
     cp -r /app/models/* "${MODEL_REGISTRY_PATH:-/models/}/" 2>/dev/null || true
 fi
 
-# Initialize database schema if not exists, or run migrations if existing
-if [ ! -f "$DUCKDB_PATH" ]; then
-    echo "Initializing DuckDB schema..."
-    python scripts/db/init_db.py --db "$DUCKDB_PATH" || true
+# Wait briefly for PostgreSQL if DATABASE_URL is configured
+if [ -n "$DATABASE_URL" ]; then
+    echo "Initializing PostgreSQL schema & running migrations..."
+    python -m scripts.db.init_db || true
+    python -m scripts.db.migrate || true
 
-    # Generate synthetic data for demo / exploration (lightweight 2000 rows for fast startup)
+    # Only seed synthetic transactions when database is completely empty
     if [ "${GENERATE_SYNTHETIC:-true}" = "true" ]; then
-        echo "Generating seed transactions..."
-        python scripts/utils/generate_synthetic.py --rows 2000 --output "$DUCKDB_PATH" || true
+        TXN_COUNT=$(python -c "from scripts.db.connection import open_direct_conn; c=open_direct_conn(); print(c.execute('SELECT COUNT(*) FROM transactions').fetchone()[0]); c.close()" 2>/dev/null || echo "0")
+        if [ "${TXN_COUNT:-0}" = "0" ]; then
+            echo "Transactions table is empty — generating initial seed transactions..."
+            python -m scripts.utils.generate_synthetic --rows 2000 || true
+        else
+            echo "PostgreSQL already contains ${TXN_COUNT} transactions — skipping synthetic seed."
+        fi
+    fi
+
+    # Generate forecast predictions if models exist (non-blocking)
+    if [ -f "${MODEL_REGISTRY_PATH:-/models/}/cash_forecast.joblib" ]; then
+        echo "Generating cash flow forecast predictions..."
+        python -m scripts.ml.predict_cashflow --model "${MODEL_REGISTRY_PATH:-/models/}/cash_forecast.joblib" || true
     fi
 else
-    echo "Running database migrations..."
-    python scripts/db/migrate.py --db "$DUCKDB_PATH" || true
-fi
-
-# Generate forecast predictions if models exist (non-blocking)
-if [ -f "${MODEL_REGISTRY_PATH:-/models/}/cash_forecast.joblib" ] && [ -f "$DUCKDB_PATH" ]; then
-    echo "Generating cash flow forecast predictions..."
-    python scripts/ml/predict_cashflow.py --db "$DUCKDB_PATH" --model "${MODEL_REGISTRY_PATH:-/models/}/cash_forecast.joblib" || true
+    echo "WARNING: DATABASE_URL is not set. Skipping startup DB initialization."
 fi
 
 # Start cron daemon in background if root/permitted

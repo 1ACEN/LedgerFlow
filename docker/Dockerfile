@@ -68,7 +68,6 @@ RUN chmod 0644 /etc/cron.d/ledgerflow && crontab /etc/cron.d/ledgerflow
 # Environment
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    DUCKDB_PATH=/data/ledgerflow.duckdb \
     MODEL_REGISTRY_PATH=/models/ \
     WEBHOOK_PORT=8080
 
