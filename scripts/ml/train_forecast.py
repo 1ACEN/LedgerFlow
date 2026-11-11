@@ -10,15 +10,17 @@ Usage:
 """
 
 import argparse
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
-import duckdb
 import lightgbm as lgb
 import polars as pl
 from joblib import dump
 from rich.console import Console
 from sklearn.metrics import mean_absolute_error, mean_pinball_loss
+
+from scripts.db.connection import normalize_database_url, open_direct_conn, read_polars
 
 console = Console()
 
@@ -27,9 +29,7 @@ console = Console()
 # =============================================================================
 
 
-def prepare_features(
-    conn: duckdb.DuckDBPyConnection, lookback_days: int = 365
-) -> tuple[pl.DataFrame, pl.DataFrame]:
+def prepare_features(conn: Any, lookback_days: int = 365) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Extract and engineer features for cash flow forecasting."""
 
     console.log("Loading transaction data...")
@@ -51,7 +51,7 @@ def prepare_features(
         GROUP BY posted_date
         ORDER BY posted_date
     """
-    daily = conn.execute(query).pl()
+    daily = read_polars(conn, query)
 
     if len(daily) < 60:
         raise ValueError(f"Need at least 60 days of data, got {len(daily)}")
@@ -189,7 +189,12 @@ def evaluate_model(model: lgb.Booster, X_val, y_val, alpha: float) -> dict:
 
 def main():
     parser = argparse.ArgumentParser(description="Train cash flow forecast model")
-    parser.add_argument("--db", type=Path, default=Path("data/ledgerflow.duckdb"))
+    parser.add_argument(
+        "--db-url",
+        dest="db_url",
+        default=None,
+        help="PostgreSQL connection URL (defaults to DATABASE_URL)",
+    )
     parser.add_argument("--output", type=Path, default=Path("models/cash_forecast.joblib"))
     parser.add_argument("--lookback-days", type=int, default=365)
     args = parser.parse_args()
@@ -198,7 +203,7 @@ def main():
 
     console.rule("[bold blue]LedgerFlow Cash Flow Forecast Training[/bold blue]")
 
-    conn = duckdb.connect(str(args.db), read_only=True)
+    conn = open_direct_conn(normalize_database_url(args.db_url))
 
     # Prepare features
     X_train, y_train, X_val, y_val, feature_cols, val_df = prepare_features(
@@ -225,12 +230,13 @@ def main():
     metrics_p90 = evaluate_model(model_p90, X_val, y_val, alpha=0.9)
 
     # Save model bundle
+    now_utc = datetime.now(UTC)
     model_bundle = {
         "models": {"p10": model_p10, "p50": model_p50, "p90": model_p90},
         "feature_columns": feature_cols,
         "metrics": {"p10": metrics_p10, "p50": metrics_p50, "p90": metrics_p90},
-        "trained_at": datetime.utcnow().isoformat(),
-        "version": f"v{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}",
+        "trained_at": now_utc.isoformat(),
+        "version": f"v{now_utc.strftime('%Y%m%d_%H%M%S')}",
         "lookback_days": args.lookback_days,
     }
 

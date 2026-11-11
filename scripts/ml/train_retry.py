@@ -12,13 +12,20 @@ Usage:
 import argparse
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
-import duckdb
 import polars as pl
 import xgboost as xgb
 from joblib import dump
 from rich.console import Console
 from sklearn.metrics import average_precision_score, classification_report, roc_auc_score
+
+from scripts.db.connection import (
+    copy_upsert_dataframe,
+    normalize_database_url,
+    open_direct_conn,
+    read_polars,
+)
 
 console = Console()
 
@@ -53,7 +60,7 @@ CARD_BRAND_MAP = {brand: i for i, brand in enumerate(CARD_BRAND_ORDER)}
 CARD_FUNDING_MAP = {funding: i for i, funding in enumerate(CARD_FUNDING_ORDER)}
 
 
-def prepare_features(conn: duckdb.DuckDBPyConnection) -> tuple:
+def prepare_features(conn: Any) -> tuple:
     """Build training dataset from historical declines and their retry outcomes."""
 
     console.log("Loading decline events with retry outcomes...")
@@ -64,8 +71,8 @@ def prepare_features(conn: duckdb.DuckDBPyConnection) -> tuple:
             SELECT
                 t.transaction_id,
                 t.decline_code,
-                COALESCE(json_extract_string(t.metadata_json, '$.card_brand'), 'Visa') AS card_brand,
-                COALESCE(json_extract_string(t.metadata_json, '$.card_funding'), 'credit') AS card_funding,
+                COALESCE(t.metadata_json::jsonb->>'card_brand', 'Visa') AS card_brand,
+                COALESCE(t.metadata_json::jsonb->>'card_funding', 'credit') AS card_funding,
                 t.amount_usd,
                 EXTRACT(HOUR FROM t.occurred_at)::INT AS occurred_hour,
                 t.customer_id,
@@ -116,7 +123,7 @@ def prepare_features(conn: duckdb.DuckDBPyConnection) -> tuple:
         ORDER BY d.occurred_at
     """
 
-    df = conn.execute(query).pl()
+    df = read_polars(conn, query)
     console.log(f"Loaded {len(df)} decline events")
 
     if len(df) < 30:
@@ -259,7 +266,12 @@ def map_to_action(proba: float, amount_usd: float) -> tuple[str, str]:
 
 def main():
     parser = argparse.ArgumentParser(description="Train decline retry advisor model")
-    parser.add_argument("--db", type=Path, default=Path("data/ledgerflow.duckdb"))
+    parser.add_argument(
+        "--db-url",
+        dest="db_url",
+        default=None,
+        help="PostgreSQL connection URL (defaults to DATABASE_URL)",
+    )
     parser.add_argument("--output", type=Path, default=Path("models/decline_retry.joblib"))
     args = parser.parse_args()
 
@@ -267,7 +279,7 @@ def main():
 
     console.rule("[bold blue]LedgerFlow Decline Retry Advisor Training[/bold blue]")
 
-    conn = duckdb.connect(str(args.db))
+    conn = open_direct_conn(normalize_database_url(args.db_url))
 
     # Prepare features
     X_train, y_train, X_val, y_val, feature_cols, val_df = prepare_features(conn)
@@ -321,7 +333,7 @@ def main():
 
 
 def score_and_record_predictions(
-    conn: duckdb.DuckDBPyConnection,
+    conn: Any,
     model_bundle: dict,
     limit: int = 100,
 ) -> int:
@@ -337,8 +349,8 @@ def score_and_record_predictions(
             SELECT
                 t.transaction_id,
                 t.decline_code,
-                COALESCE(json_extract_string(t.metadata_json, '$.card_brand'), 'Visa') AS card_brand,
-                COALESCE(json_extract_string(t.metadata_json, '$.card_funding'), 'credit') AS card_funding,
+                COALESCE(t.metadata_json::jsonb->>'card_brand', 'Visa') AS card_brand,
+                COALESCE(t.metadata_json::jsonb->>'card_funding', 'credit') AS card_funding,
                 t.amount_usd,
                 EXTRACT(HOUR FROM t.occurred_at)::INT AS occurred_hour,
                 t.customer_id,
@@ -369,7 +381,7 @@ def score_and_record_predictions(
         LEFT JOIN customer_history ch ON d.customer_id = ch.customer_id
         ORDER BY d.occurred_at DESC
     """
-    df = conn.execute(query).pl()
+    df = read_polars(conn, query)
     if len(df) == 0:
         return 0
 
@@ -442,7 +454,6 @@ def score_and_record_predictions(
         )
 
     pred_df = pl.DataFrame(pred_rows)
-    conn.register("pred_staging", pred_df)
     conn.execute("CREATE SCHEMA IF NOT EXISTS ml;")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS ml.decline_predictions (
@@ -450,19 +461,24 @@ def score_and_record_predictions(
             decline_code                VARCHAR,
             card_brand                  VARCHAR,
             card_funding                VARCHAR,
-            amount_usd                  DOUBLE,
+            amount_usd                  DOUBLE PRECISION,
             occurred_hour               SMALLINT,
             customer_id                 VARCHAR,
-            customer_retry_history      JSON,
-            retry_success_probability   DOUBLE,
+            customer_retry_history      JSONB,
+            retry_success_probability   DOUBLE PRECISION,
             recommended_action          VARCHAR,
             recommended_retry_at        TIMESTAMP WITH TIME ZONE,
-            expected_recovery_usd       DOUBLE,
+            expected_recovery_usd       DOUBLE PRECISION,
             model_version               VARCHAR,
             scored_at                   TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         );
     """)
-    conn.execute("INSERT OR REPLACE INTO ml.decline_predictions SELECT * FROM pred_staging")
+    copy_upsert_dataframe(
+        conn,
+        "ml.decline_predictions",
+        pred_df,
+        conflict_cols=["transaction_id"],
+    )
     return len(pred_rows)
 
 

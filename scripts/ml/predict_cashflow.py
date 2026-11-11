@@ -12,12 +12,19 @@ Usage:
 import argparse
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
-import duckdb
 import numpy as np
 import polars as pl
 from joblib import load
 from rich.console import Console
+
+from scripts.db.connection import (
+    copy_upsert_dataframe,
+    normalize_database_url,
+    open_direct_conn,
+    read_polars,
+)
 
 console = Console()
 
@@ -30,7 +37,7 @@ def load_model(model_path: Path) -> dict:
     return load(model_path)
 
 
-def prepare_latest_features(conn: duckdb.DuckDBPyConnection, feature_cols: list) -> np.ndarray:
+def prepare_latest_features(conn: Any, feature_cols: list) -> tuple[np.ndarray, float, Any]:
     """Prepare feature vector for the most recent date."""
 
     # Get the last 90 days of daily cash flow data relative to latest data
@@ -53,7 +60,7 @@ def prepare_latest_features(conn: duckdb.DuckDBPyConnection, feature_cols: list)
         GROUP BY posted_date
         ORDER BY posted_date
     """
-    daily = conn.execute(query).pl()
+    daily = read_polars(conn, query)
 
     if len(daily) < 30:
         raise ValueError(f"Need at least 30 days of data, got {len(daily)}")
@@ -174,44 +181,35 @@ def generate_forecast(
     return pl.DataFrame(predictions)
 
 
-def write_predictions(df: pl.DataFrame, db_path: Path) -> int:
-    """Write predictions to DuckDB."""
-    conn = duckdb.connect(str(db_path))
+def write_predictions(df: pl.DataFrame, db_url: str | None = None) -> int:
+    """Write predictions to PostgreSQL."""
+    conn = open_direct_conn(normalize_database_url(db_url))
+    try:
+        copy_upsert_dataframe(
+            conn,
+            "ml.cash_flow_forecast",
+            df,
+            conflict_cols=["forecast_date", "prediction_date"],
+        )
+        forecast_date = df["forecast_date"][0]
+        count = conn.execute(
+            "SELECT COUNT(*) FROM ml.cash_flow_forecast WHERE forecast_date = %s",
+            [forecast_date],
+        ).fetchone()[0]
+    finally:
+        conn.close()
 
-    conn.register("staging_forecast", df)
-    conn.execute("""
-        INSERT INTO ml.cash_flow_forecast BY NAME
-        SELECT * FROM staging_forecast
-        ON CONFLICT (forecast_date, prediction_date) DO UPDATE SET
-            p10_net_flow_usd = EXCLUDED.p10_net_flow_usd,
-            p50_net_flow_usd = EXCLUDED.p50_net_flow_usd,
-            p90_net_flow_usd = EXCLUDED.p90_net_flow_usd,
-            p50_inflows_usd = EXCLUDED.p50_inflows_usd,
-            p50_outflows_usd = EXCLUDED.p50_outflows_usd,
-            starting_cash_usd = EXCLUDED.starting_cash_usd,
-            p10_cumulative_cash_usd = EXCLUDED.p10_cumulative_cash_usd,
-            p50_cumulative_cash_usd = EXCLUDED.p50_cumulative_cash_usd,
-            p90_cumulative_cash_usd = EXCLUDED.p90_cumulative_cash_usd,
-            p10_runway_days = EXCLUDED.p10_runway_days,
-            p50_runway_days = EXCLUDED.p50_runway_days,
-            p90_runway_days = EXCLUDED.p90_runway_days,
-            model_version = EXCLUDED.model_version,
-            model_trained_at = EXCLUDED.model_trained_at,
-            feature_set_version = EXCLUDED.feature_set_version
-    """)
-
-    forecast_date = df["forecast_date"][0]
-    count = conn.execute(
-        "SELECT COUNT(*) FROM ml.cash_flow_forecast WHERE forecast_date = ?", [forecast_date]
-    ).fetchone()[0]
-    conn.close()
-
-    return count
+    return int(count or 0)
 
 
 def main():
     parser = argparse.ArgumentParser(description="Generate daily cash flow forecast")
-    parser.add_argument("--db", type=Path, default=Path("data/ledgerflow.duckdb"))
+    parser.add_argument(
+        "--db-url",
+        dest="db_url",
+        default=None,
+        help="PostgreSQL connection URL (defaults to DATABASE_URL)",
+    )
     parser.add_argument("--model", type=Path, default=Path("models/cash_forecast.joblib"))
     parser.add_argument("--horizon", type=int, default=91, help="Forecast horizon in days")
     args = parser.parse_args()
@@ -221,16 +219,16 @@ def main():
     model_bundle = load_model(args.model)
     console.log(f"Model version: {model_bundle['version']}, trained: {model_bundle['trained_at']}")
 
-    conn = duckdb.connect(str(args.db), read_only=True)
-
-    X, current_cash, last_date = prepare_latest_features(conn, model_bundle["feature_columns"])
+    conn = open_direct_conn(normalize_database_url(args.db_url))
+    try:
+        X, current_cash, last_date = prepare_latest_features(conn, model_bundle["feature_columns"])
+    finally:
+        conn.close()
 
     forecast_df = generate_forecast(model_bundle, X, current_cash, last_date, args.horizon)
 
-    conn.close()
-
     # Write predictions
-    count = write_predictions(forecast_df, args.db)
+    count = write_predictions(forecast_df, args.db_url)
 
     console.log(f"[green][OK][/green] Generated {count} forecast rows (13 weeks)")
     console.log(f"  P50 Runway: {forecast_df['p50_runway_days'][0]} days")
