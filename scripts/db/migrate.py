@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
 """
-LedgerFlow: Database Migration Runner
+LedgerFlow: Database Migration Runner (PostgreSQL)
 
-Applies schema migrations on deployment (Fly.io release command).
+Applies schema migrations on deployment (Fly.io / Render release command).
 Tracks applied migrations in a version table.
 
 Usage:
-    python scripts/migrate.py --db data/ledgerflow.duckdb
+    python scripts/db/migrate.py
+    python scripts/db/migrate.py --db-url postgresql://ledgerflow:ledgerflow@localhost:5433/ledgerflow
 """
 
-import argparse
-from pathlib import Path
+from __future__ import annotations
 
-import duckdb
+import argparse
+from typing import Any
+
 from rich.console import Console
+
+from scripts.db.connection import normalize_database_url, open_direct_conn
 
 console = Console()
 
@@ -44,7 +48,7 @@ MIGRATIONS = [
             source              VARCHAR NOT NULL,
             amount              BIGINT NOT NULL,
             currency            CHAR(3) NOT NULL,
-            fx_rate             DOUBLE NOT NULL DEFAULT 1.0,
+            fx_rate             DOUBLE PRECISION NOT NULL DEFAULT 1.0,
             net_amount          BIGINT NOT NULL,
             fee_amount          BIGINT NOT NULL DEFAULT 0,
             customer_id         VARCHAR,
@@ -60,12 +64,12 @@ MIGRATIONS = [
             dispute_status      VARCHAR,
             is_recurring        BOOLEAN DEFAULT FALSE,
             description         VARCHAR,
-            metadata_json       JSON,
+            metadata_json       JSONB,
             ingested_at         TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
             batch_id            VARCHAR,
-            amount_usd          DOUBLE GENERATED ALWAYS AS (amount * fx_rate / 100.0),
-            net_amount_usd      DOUBLE GENERATED ALWAYS AS (net_amount * fx_rate / 100.0),
-            fee_amount_usd      DOUBLE GENERATED ALWAYS AS (fee_amount * fx_rate / 100.0)
+            amount_usd          DOUBLE PRECISION GENERATED ALWAYS AS (amount * fx_rate / 100.0) STORED,
+            net_amount_usd      DOUBLE PRECISION GENERATED ALWAYS AS (net_amount * fx_rate / 100.0) STORED,
+            fee_amount_usd      DOUBLE PRECISION GENERATED ALWAYS AS (fee_amount * fx_rate / 100.0) STORED
         );
 
         CREATE TABLE IF NOT EXISTS customers (
@@ -75,7 +79,7 @@ MIGRATIONS = [
             created_at      TIMESTAMP WITH TIME ZONE,
             country         CHAR(2),
             plan            VARCHAR,
-            ltv_usd         DOUBLE DEFAULT 0,
+            ltv_usd         DOUBLE PRECISION DEFAULT 0,
             is_active       BOOLEAN DEFAULT TRUE
         );
 
@@ -93,25 +97,25 @@ MIGRATIONS = [
         "Create ML tables",
         """
         CREATE TABLE IF NOT EXISTS ml.cash_flow_forecast (
-            forecast_date       DATE NOT NULL,
-            prediction_date     DATE NOT NULL,
-            horizon_days        SMALLINT NOT NULL,
-            p10_net_flow_usd    DOUBLE,
-            p50_net_flow_usd    DOUBLE,
-            p90_net_flow_usd    DOUBLE,
-            p50_inflows_usd     DOUBLE,
-            p50_outflows_usd    DOUBLE,
-            starting_cash_usd   DOUBLE,
-            p10_cumulative_cash_usd DOUBLE,
-            p50_cumulative_cash_usd DOUBLE,
-            p90_cumulative_cash_usd DOUBLE,
-            p10_runway_days     SMALLINT,
-            p50_runway_days     SMALLINT,
-            p90_runway_days     SMALLINT,
-            model_version       VARCHAR,
-            model_trained_at    TIMESTAMP WITH TIME ZONE,
-            feature_set_version VARCHAR,
-            created_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            forecast_date           DATE NOT NULL,
+            prediction_date         DATE NOT NULL,
+            horizon_days            SMALLINT NOT NULL,
+            p10_net_flow_usd        DOUBLE PRECISION,
+            p50_net_flow_usd        DOUBLE PRECISION,
+            p90_net_flow_usd        DOUBLE PRECISION,
+            p50_inflows_usd         DOUBLE PRECISION,
+            p50_outflows_usd        DOUBLE PRECISION,
+            starting_cash_usd       DOUBLE PRECISION,
+            p10_cumulative_cash_usd DOUBLE PRECISION,
+            p50_cumulative_cash_usd DOUBLE PRECISION,
+            p90_cumulative_cash_usd DOUBLE PRECISION,
+            p10_runway_days         SMALLINT,
+            p50_runway_days         SMALLINT,
+            p90_runway_days         SMALLINT,
+            model_version           VARCHAR,
+            model_trained_at        TIMESTAMP WITH TIME ZONE,
+            feature_set_version     VARCHAR,
+            created_at              TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
             PRIMARY KEY (forecast_date, prediction_date)
         );
 
@@ -120,14 +124,14 @@ MIGRATIONS = [
             decline_code                VARCHAR,
             card_brand                  VARCHAR,
             card_funding                VARCHAR,
-            amount_usd                  DOUBLE,
+            amount_usd                  DOUBLE PRECISION,
             occurred_hour               SMALLINT,
             customer_id                 VARCHAR,
-            customer_retry_history      JSON,
-            retry_success_probability   DOUBLE,
+            customer_retry_history      JSONB,
+            retry_success_probability   DOUBLE PRECISION,
             recommended_action          VARCHAR,
             recommended_retry_at        TIMESTAMP WITH TIME ZONE,
-            expected_recovery_usd       DOUBLE,
+            expected_recovery_usd       DOUBLE PRECISION,
             model_version               VARCHAR,
             scored_at                   TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         );
@@ -136,7 +140,7 @@ MIGRATIONS = [
             model_name          VARCHAR PRIMARY KEY,
             version             VARCHAR NOT NULL,
             file_path           VARCHAR NOT NULL,
-            metrics_json        JSON,
+            metrics_json        JSONB,
             trained_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
             is_active           BOOLEAN DEFAULT TRUE,
             feature_columns     VARCHAR[],
@@ -179,7 +183,7 @@ MIGRATIONS = [
             SUM(amount_usd) FILTER (WHERE type IN ('charge', 'invoice_payment') AND status = 'succeeded') AS revenue_usd,
             SUM(amount_usd) FILTER (WHERE type = 'refund' AND status = 'succeeded') AS refunds_usd,
             SUM(amount_usd) FILTER (WHERE type IN ('charge', 'invoice_payment') AND status = 'succeeded') -
-            SUM(amount_usd) FILTER (WHERE type = 'refund' AND status = 'succeeded') AS net_revenue_usd
+            COALESCE(SUM(amount_usd) FILTER (WHERE type = 'refund' AND status = 'succeeded'), 0) AS net_revenue_usd
         FROM transactions
         WHERE basis = 'accrual' AND product_line IS NOT NULL
         GROUP BY DATE_TRUNC('month', occurred_at), product_line
@@ -271,7 +275,7 @@ MIGRATIONS = [
     ),
     (
         "006",
-        "Add explicit unique indexes for DuckDB v1.5 ON CONFLICT",
+        "Add explicit unique indexes for ON CONFLICT",
         """
         CREATE UNIQUE INDEX IF NOT EXISTS ux_transactions_id
             ON transactions(transaction_id);
@@ -296,10 +300,41 @@ MIGRATIONS = [
         ORDER BY month, account_code;
     """,
     ),
+    (
+        "008",
+        "Create users authentication table and ar_aging view",
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            user_id             VARCHAR PRIMARY KEY,
+            username            VARCHAR UNIQUE NOT NULL,
+            password_hash       VARCHAR NOT NULL,
+            salt                VARCHAR NOT NULL,
+            full_name           VARCHAR NOT NULL,
+            role_id             VARCHAR NOT NULL,
+            created_at          TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE OR REPLACE VIEW analytics.ar_aging AS
+        SELECT
+            t.customer_id,
+            c.customer_name,
+            COUNT(*) AS invoice_count,
+            SUM(amount_usd) AS total_outstanding_usd,
+            SUM(amount_usd) FILTER (WHERE occurred_at >= NOW() - INTERVAL '30 days') AS current_usd,
+            SUM(amount_usd) FILTER (WHERE occurred_at < NOW() - INTERVAL '30 days' AND occurred_at >= NOW() - INTERVAL '60 days') AS days_31_60_usd,
+            SUM(amount_usd) FILTER (WHERE occurred_at < NOW() - INTERVAL '60 days' AND occurred_at >= NOW() - INTERVAL '90 days') AS days_61_90_usd,
+            SUM(amount_usd) FILTER (WHERE occurred_at < NOW() - INTERVAL '90 days') AS days_90_plus_usd
+        FROM transactions t
+        JOIN customers c ON t.customer_id = c.customer_id
+        WHERE type = 'invoice_payment' AND status IN ('pending', 'succeeded') AND basis = 'accrual'
+        GROUP BY t.customer_id, c.customer_name
+        ORDER BY total_outstanding_usd DESC;
+    """,
+    ),
 ]
 
 
-def ensure_migration_table(conn: duckdb.DuckDBPyConnection):
+def ensure_migration_table(conn: Any) -> None:
     """Create migration tracking table if not exists."""
     conn.execute("""
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -311,7 +346,7 @@ def ensure_migration_table(conn: duckdb.DuckDBPyConnection):
     """)
 
 
-def get_applied_migrations(conn: duckdb.DuckDBPyConnection) -> set:
+def get_applied_migrations(conn: Any) -> set[str]:
     """Get set of already applied migration versions."""
     try:
         rows = conn.execute("SELECT version FROM schema_migrations").fetchall()
@@ -320,24 +355,25 @@ def get_applied_migrations(conn: duckdb.DuckDBPyConnection) -> set:
         return set()
 
 
-def apply_migration(conn: duckdb.DuckDBPyConnection, version: str, description: str, sql: str):
-    """Apply a single migration."""
+def apply_migration(conn: Any, version: str, description: str, sql: str) -> None:
+    """Apply a single migration atomically."""
     console.log(f"Applying migration {version}: {description}")
-    conn.execute(sql)
-    conn.execute(
-        """
-        INSERT INTO schema_migrations (version, description, checksum)
-        VALUES (?, ?, ?)
-        ON CONFLICT (version) DO UPDATE SET
-            description = EXCLUDED.description,
-            applied_at = NOW(),
-            checksum = EXCLUDED.checksum
-    """,
-        [version, description, str(hash(sql))],
-    )
+    with conn.transaction():
+        conn.execute(sql)
+        conn.execute(
+            """
+            INSERT INTO schema_migrations (version, description, checksum)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (version) DO UPDATE SET
+                description = EXCLUDED.description,
+                applied_at = NOW(),
+                checksum = EXCLUDED.checksum
+        """,
+            [version, description, str(hash(sql))],
+        )
 
 
-def run_migrations(conn: duckdb.DuckDBPyConnection) -> list[str]:
+def run_migrations(conn: Any) -> list[str]:
     """Apply all pending migrations to the database connection."""
     ensure_migration_table(conn)
     applied = get_applied_migrations(conn)
@@ -350,39 +386,41 @@ def run_migrations(conn: duckdb.DuckDBPyConnection) -> list[str]:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run database migrations")
-    parser.add_argument("--db", type=Path, default=Path("data/ledgerflow.duckdb"))
+    parser = argparse.ArgumentParser(description="Run PostgreSQL database migrations")
+    parser.add_argument(
+        "--db-url",
+        "--db",
+        dest="db_url",
+        default=None,
+        help="PostgreSQL connection URL (defaults to DATABASE_URL env var)",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Show what would be applied")
     args = parser.parse_args()
 
-    args.db.parent.mkdir(parents=True, exist_ok=True)
+    url = normalize_database_url(args.db_url)
+    console.rule("[bold blue]LedgerFlow PostgreSQL Migrations[/bold blue]")
 
-    console.rule("[bold blue]LedgerFlow Database Migrations[/bold blue]")
+    conn = open_direct_conn(url)
+    try:
+        ensure_migration_table(conn)
+        applied = get_applied_migrations(conn)
 
-    conn = duckdb.connect(str(args.db))
+        console.log(f"Already applied: {sorted(applied)}")
 
-    ensure_migration_table(conn)
-    applied = get_applied_migrations(conn)
+        for version, description, sql in MIGRATIONS:
+            if version in applied:
+                console.log(f"[dim]Skip {version}: {description}[/dim]")
+                continue
 
-    console.log(f"Already applied: {sorted(applied)}")
+            if args.dry_run:
+                console.log(f"[yellow]Would apply {version}: {description}[/yellow]")
+            else:
+                apply_migration(conn, version, description, sql)
+                console.log(f"[green][OK] Applied {version}: {description}[/green]")
+    finally:
+        conn.close()
 
-    for version, description, sql in MIGRATIONS:
-        if version in applied:
-            console.log(f"  [dim]Skipping {version} (already applied)[/dim]")
-            continue
-
-        if args.dry_run:
-            console.log(f"  [yellow]Would apply[/yellow] {version}: {description}")
-        else:
-            apply_migration(conn, version, description, sql)
-            console.log(f"  [green]Applied[/green] {version}")
-
-    if args.dry_run:
-        console.log("\n[yellow]Dry run complete - no changes made[/yellow]")
-    else:
-        console.rule("[bold green]Migrations complete![/bold green]")
-
-    conn.close()
+    console.rule("[bold green]Migrations complete![/bold green]")
 
 
 if __name__ == "__main__":

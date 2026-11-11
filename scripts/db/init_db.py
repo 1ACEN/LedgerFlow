@@ -1,25 +1,28 @@
 #!/usr/bin/env python3
 """
-LedgerFlow: Database Initialization
+LedgerFlow: Database Initialization (PostgreSQL)
 
-Creates the DuckDB schema, views, and indexes for the transaction ledger.
+Creates the PostgreSQL schemas, tables, views, and indexes for the transaction ledger.
 Run once on first deployment or when schema changes.
 
 Usage:
-    python scripts/init_db.py --db data/ledgerflow.duckdb
+    python scripts/db/init_db.py
+    python scripts/db/init_db.py --db-url postgresql://ledgerflow:ledgerflow@localhost:5433/ledgerflow
 """
 
-import argparse
-from pathlib import Path
+from __future__ import annotations
 
-import duckdb
+import argparse
+
 from rich.console import Console
+
+from scripts.db.connection import normalize_database_url, open_direct_conn
 
 console = Console()
 
 SCHEMA_SQL = """
 -- =============================================================================
--- LEDGERFLOW SCHEMA
+-- LEDGERFLOW POSTGRESQL SCHEMA
 -- =============================================================================
 
 CREATE SCHEMA IF NOT EXISTS analytics;
@@ -48,7 +51,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     source              VARCHAR NOT NULL,      -- stripe, adyen, ach, wire, plaid, manual_journal
     amount              BIGINT NOT NULL,       -- Cents in source currency
     currency            CHAR(3) NOT NULL,      -- ISO 4217
-    fx_rate             DOUBLE NOT NULL DEFAULT 1.0,
+    fx_rate             DOUBLE PRECISION NOT NULL DEFAULT 1.0,
     net_amount          BIGINT NOT NULL,       -- After fees
     fee_amount          BIGINT NOT NULL DEFAULT 0,
     customer_id         VARCHAR,
@@ -64,13 +67,13 @@ CREATE TABLE IF NOT EXISTS transactions (
     dispute_status      VARCHAR,
     is_recurring        BOOLEAN DEFAULT FALSE,
     description         VARCHAR,
-    metadata_json       JSON,
+    metadata_json       JSONB,
     ingested_at         TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     batch_id            VARCHAR,
-    -- Derived (computed on insert)
-    amount_usd          DOUBLE GENERATED ALWAYS AS (amount * fx_rate / 100.0),
-    net_amount_usd      DOUBLE GENERATED ALWAYS AS (net_amount * fx_rate / 100.0),
-    fee_amount_usd      DOUBLE GENERATED ALWAYS AS (fee_amount * fx_rate / 100.0)
+    -- Derived (computed & stored on insert/update)
+    amount_usd          DOUBLE PRECISION GENERATED ALWAYS AS (amount * fx_rate / 100.0) STORED,
+    net_amount_usd      DOUBLE PRECISION GENERATED ALWAYS AS (net_amount * fx_rate / 100.0) STORED,
+    fee_amount_usd      DOUBLE PRECISION GENERATED ALWAYS AS (fee_amount * fx_rate / 100.0) STORED
 );
 
 -- Customer dimension
@@ -81,7 +84,7 @@ CREATE TABLE IF NOT EXISTS customers (
     created_at      TIMESTAMP WITH TIME ZONE,
     country         CHAR(2),
     plan            VARCHAR,
-    ltv_usd         DOUBLE DEFAULT 0,
+    ltv_usd         DOUBLE PRECISION DEFAULT 0,
     is_active       BOOLEAN DEFAULT TRUE
 );
 
@@ -111,25 +114,25 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- Cash flow forecast predictions (generated daily)
 CREATE TABLE IF NOT EXISTS ml.cash_flow_forecast (
-    forecast_date       DATE NOT NULL,
-    prediction_date     DATE NOT NULL,
-    horizon_days        SMALLINT NOT NULL,
-    p10_net_flow_usd    DOUBLE,
-    p50_net_flow_usd    DOUBLE,
-    p90_net_flow_usd    DOUBLE,
-    p50_inflows_usd     DOUBLE,
-    p50_outflows_usd    DOUBLE,
-    starting_cash_usd   DOUBLE,
-    p10_cumulative_cash_usd DOUBLE,
-    p50_cumulative_cash_usd DOUBLE,
-    p90_cumulative_cash_usd DOUBLE,
-    p10_runway_days     SMALLINT,
-    p50_runway_days     SMALLINT,
-    p90_runway_days     SMALLINT,
-    model_version       VARCHAR,
-    model_trained_at    TIMESTAMP WITH TIME ZONE,
-    feature_set_version VARCHAR,
-    created_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    forecast_date           DATE NOT NULL,
+    prediction_date         DATE NOT NULL,
+    horizon_days            SMALLINT NOT NULL,
+    p10_net_flow_usd        DOUBLE PRECISION,
+    p50_net_flow_usd        DOUBLE PRECISION,
+    p90_net_flow_usd        DOUBLE PRECISION,
+    p50_inflows_usd         DOUBLE PRECISION,
+    p50_outflows_usd        DOUBLE PRECISION,
+    starting_cash_usd       DOUBLE PRECISION,
+    p10_cumulative_cash_usd DOUBLE PRECISION,
+    p50_cumulative_cash_usd DOUBLE PRECISION,
+    p90_cumulative_cash_usd DOUBLE PRECISION,
+    p10_runway_days         SMALLINT,
+    p50_runway_days         SMALLINT,
+    p90_runway_days         SMALLINT,
+    model_version           VARCHAR,
+    model_trained_at        TIMESTAMP WITH TIME ZONE,
+    feature_set_version     VARCHAR,
+    created_at              TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     PRIMARY KEY (forecast_date, prediction_date)
 );
 
@@ -139,14 +142,14 @@ CREATE TABLE IF NOT EXISTS ml.decline_predictions (
     decline_code                VARCHAR,
     card_brand                  VARCHAR,
     card_funding                VARCHAR,
-    amount_usd                  DOUBLE,
+    amount_usd                  DOUBLE PRECISION,
     occurred_hour               SMALLINT,
     customer_id                 VARCHAR,
-    customer_retry_history      JSON,
-    retry_success_probability   DOUBLE,
+    customer_retry_history      JSONB,
+    retry_success_probability   DOUBLE PRECISION,
     recommended_action          VARCHAR,  -- 'retry_1h', 'retry_24h', 'retry_72h', 'do_not_retry'
     recommended_retry_at        TIMESTAMP WITH TIME ZONE,
-    expected_recovery_usd       DOUBLE,
+    expected_recovery_usd       DOUBLE PRECISION,
     model_version               VARCHAR,
     scored_at                   TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -156,7 +159,7 @@ CREATE TABLE IF NOT EXISTS ml.model_registry (
     model_name          VARCHAR PRIMARY KEY,
     version             VARCHAR NOT NULL,
     file_path           VARCHAR NOT NULL,
-    metrics_json        JSON,
+    metrics_json        JSONB,
     trained_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     is_active           BOOLEAN DEFAULT TRUE,
     feature_columns     VARCHAR[],
@@ -164,7 +167,7 @@ CREATE TABLE IF NOT EXISTS ml.model_registry (
 );
 
 -- =============================================================================
--- ANALYTICS VIEWS (consumed by the unified dashboard /reports/* endpoints)
+-- ANALYTICS VIEWS (consumed by dashboard /reports/* endpoints & Power BI)
 -- =============================================================================
 
 -- Daily cash position
@@ -201,7 +204,7 @@ SELECT
     SUM(amount_usd) FILTER (WHERE type IN ('charge', 'invoice_payment') AND status = 'succeeded') AS revenue_usd,
     SUM(amount_usd) FILTER (WHERE type = 'refund' AND status = 'succeeded') AS refunds_usd,
     SUM(amount_usd) FILTER (WHERE type IN ('charge', 'invoice_payment') AND status = 'succeeded') -
-    SUM(amount_usd) FILTER (WHERE type = 'refund' AND status = 'succeeded') AS net_revenue_usd
+    COALESCE(SUM(amount_usd) FILTER (WHERE type = 'refund' AND status = 'succeeded'), 0) AS net_revenue_usd
 FROM transactions
 WHERE basis = 'accrual' AND product_line IS NOT NULL
 GROUP BY DATE_TRUNC('month', occurred_at), product_line
@@ -274,7 +277,7 @@ FROM ml.cash_flow_forecast
 WHERE forecast_date = (SELECT MAX(forecast_date) FROM ml.cash_flow_forecast)
 ORDER BY prediction_date;
 
--- AR Aging (simplified - assumes invoice_payment type with terms)
+-- AR Aging (assumes invoice_payment type with terms)
 CREATE OR REPLACE VIEW analytics.ar_aging AS
 SELECT
     t.customer_id,
@@ -303,42 +306,44 @@ CREATE INDEX IF NOT EXISTS idx_transactions_source ON transactions(source);
 CREATE INDEX IF NOT EXISTS idx_transactions_dispute ON transactions(dispute_id);
 CREATE INDEX IF NOT EXISTS idx_cash_forecast_date ON ml.cash_flow_forecast(forecast_date);
 CREATE INDEX IF NOT EXISTS idx_decline_pred_customer ON ml.decline_predictions(customer_id);
--- Explicit unique indexes required by DuckDB v1.5 for ON CONFLICT upserts
 CREATE UNIQUE INDEX IF NOT EXISTS ux_transactions_id ON transactions(transaction_id);
 CREATE UNIQUE INDEX IF NOT EXISTS ux_transactions_idempotency ON transactions(idempotency_key);
 """
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Initialize LedgerFlow DuckDB schema")
+    parser = argparse.ArgumentParser(description="Initialize LedgerFlow PostgreSQL schema")
     parser.add_argument(
-        "--db", type=Path, default=Path("data/ledgerflow.duckdb"), help="DuckDB database path"
+        "--db-url",
+        "--db",
+        dest="db_url",
+        default=None,
+        help="PostgreSQL connection URL (defaults to DATABASE_URL env var)",
     )
     args = parser.parse_args()
 
-    args.db.parent.mkdir(parents=True, exist_ok=True)
+    url = normalize_database_url(args.db_url)
+    console.rule("[bold blue]LedgerFlow PostgreSQL Initialization[/bold blue]")
 
-    console.rule("[bold blue]LedgerFlow Database Initialization[/bold blue]")
+    conn = open_direct_conn(url)
+    try:
+        console.log("Executing PostgreSQL schema...")
+        conn.execute(SCHEMA_SQL)
 
-    conn = duckdb.connect(str(args.db))
+        tables = conn.execute("""
+            SELECT table_schema, table_name
+            FROM information_schema.tables
+            WHERE table_schema IN ('public', 'analytics', 'ml')
+            ORDER BY table_schema, table_name
+        """).fetchall()
 
-    console.log("Executing schema...")
-    conn.execute(SCHEMA_SQL)
+        console.log("Created tables/views:")
+        for schema, name in tables:
+            console.log(f"  {schema}.{name}")
+    finally:
+        conn.close()
 
-    # Verify tables
-    tables = conn.execute("""
-        SELECT table_schema, table_name
-        FROM information_schema.tables
-        WHERE table_schema IN ('main', 'analytics', 'ml')
-        ORDER BY table_schema, table_name
-    """).fetchall()
-
-    console.log("Created tables/views:")
-    for schema, name in tables:
-        console.log(f"  {schema}.{name}")
-
-    conn.close()
-    console.rule("[bold green]Database initialized successfully![/bold green]")
+    console.rule("[bold green]PostgreSQL database initialized successfully![/bold green]")
 
 
 if __name__ == "__main__":
