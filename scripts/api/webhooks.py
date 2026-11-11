@@ -38,10 +38,9 @@ from scripts.api.auth_db import (
     init_users_table,
     register_user,
 )
+from scripts.db.connection import close_pools, get_conn
 from scripts.ingestion.common import (
     _date_fields,
-    _db_lock,
-    get_conn,
     normalize_plaid_transaction,
     normalize_stripe_event,
     upsert_transactions,
@@ -72,7 +71,7 @@ app.add_middleware(
 # CONFIGURATION
 # =============================================================================
 
-DUCKDB_PATH = Path(os.getenv("DUCKDB_PATH", "data/ledgerflow.duckdb"))
+DATABASE_URL = os.getenv("DATABASE_URL")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
 STRIPE_ACCOUNT_ID = os.getenv("STRIPE_ACCOUNT_ID", "acct_default")
 PLAID_WEBHOOK_SECRET = os.getenv("PLAID_WEBHOOK_SECRET")
@@ -138,18 +137,13 @@ class SignupRequest(BaseModel):
 
 @app.on_event("startup")
 async def startup_event():
-    """On startup: ensure DB exists and optionally seed with synthetic data."""
-    DUCKDB_PATH.parent.mkdir(parents=True, exist_ok=True)
-
-    # Initialize schema if DB is brand new
+    """On startup: ensure PostgreSQL schema & users exist and optionally start demo stream."""
     try:
-        with _db_lock:
-            conn = get_conn(DUCKDB_PATH)
-            # Ensure users authentication table exists & is seeded
+        with get_conn(DATABASE_URL) as conn:
             init_users_table(conn)
 
             tables = conn.execute(
-                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"
             ).fetchall()
             existing = {r[0] for r in tables}
 
@@ -160,7 +154,6 @@ async def startup_event():
                 conn.execute(SCHEMA_SQL)
                 console.log("[green]Schema initialized.[/green]")
             else:
-                # Ensure historical outflows have realistic negative net amounts and cash basis
                 conn.execute("""
                     UPDATE transactions
                     SET net_amount = -abs(net_amount)
@@ -173,12 +166,11 @@ async def startup_event():
                     WHERE type IN ('payout', 'fee')
                       AND basis != 'cash';
                 """)
-                # Also ensure forecast table has realistic p50_outflows_usd
                 with contextlib.suppress(Exception):
                     conn.execute("""
                         UPDATE ml.cash_flow_forecast
                         SET p50_outflows_usd = (
-                            SELECT ROUND(AVG(outflows_usd), 2)
+                            SELECT ROUND(AVG(outflows_usd)::numeric, 2)::double precision
                             FROM analytics.daily_cash_position
                             WHERE outflows_usd > 0
                         )
@@ -187,16 +179,20 @@ async def startup_event():
     except Exception as e:
         console.log(f"[red]Startup DB check failed: {e}[/red]")
 
-    # Signal that the DB schema is ready before starting demo thread
     _db_ready.set()
 
-    # Kick off demo stream in background thread
     if DEMO_MODE:
         console.log(
             f"[cyan]DEMO MODE ON — synthetic transactions every {DEMO_INTERVAL_SEC}s[/cyan]"
         )
         t = threading.Thread(target=_demo_stream_loop, daemon=True)
         t.start()
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Close PostgreSQL connection pools cleanly on server shutdown."""
+    close_pools()
 
 
 # =============================================================================
@@ -241,7 +237,7 @@ def _build_demo_transaction() -> dict:
     source = random.choice(_DEMO_SOURCES)
     product_line = random.choice(_DEMO_PRODUCTS)
     amount_cents = random.randint(500, 250_000)  # $5 – $2500
-    now = datetime.now()
+    now = datetime.now(UTC)
 
     fee_amount = 0
     if txn_type == "charge" and status == "succeeded":
@@ -339,7 +335,7 @@ def _demo_stream_loop():
     while True:
         try:
             txn = _build_demo_transaction()
-            upsert_transactions([txn], DUCKDB_PATH)
+            upsert_transactions([txn], DATABASE_URL)
         except Exception as e:
             console.log(f"[red]Demo stream error: {e}[/red]")
         time.sleep(DEMO_INTERVAL_SEC)
@@ -381,10 +377,8 @@ app.mount(
 
 @app.post("/api/auth/login")
 def api_login(payload: LoginRequest):
-    """Authenticate a user against the DuckDB users database."""
-    _db_ready.wait(timeout=10.0)
-    with _db_lock:
-        conn = get_conn(DUCKDB_PATH)
+    """Authenticate a user against the PostgreSQL users database."""
+    with get_conn(DATABASE_URL) as conn:
         init_users_table(conn)
         user = authenticate_user(conn, payload.username, payload.password)
 
@@ -398,10 +392,8 @@ def api_login(payload: LoginRequest):
 
 @app.post("/api/auth/signup", status_code=201)
 def api_signup(payload: SignupRequest):
-    """Register a new user in DuckDB users database."""
-    _db_ready.wait(timeout=10.0)
-    with _db_lock:
-        conn = get_conn(DUCKDB_PATH)
+    """Register a new user in PostgreSQL users database."""
+    with get_conn(DATABASE_URL) as conn:
         init_users_table(conn)
         user, error = register_user(
             conn,
@@ -478,7 +470,7 @@ async def create_manual_transaction(body: ManualTransaction):
     Used by the live input UI and for testing.
     """
     amount_cents = int(round(body.amount_usd * 100))
-    now = datetime.now()
+    now = datetime.now(UTC)
 
     fee_amount = 0
     if body.type == "charge" and body.status == "succeeded":
@@ -531,7 +523,7 @@ async def create_manual_transaction(body: ManualTransaction):
     row.update(_date_fields(now))
 
     try:
-        upsert_transactions([row], DUCKDB_PATH)
+        upsert_transactions([row], DATABASE_URL)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -548,8 +540,7 @@ async def create_manual_transaction(body: ManualTransaction):
 async def recent_transactions(limit: int = 20):
     """Return the most recent N transactions for the live feed."""
     try:
-        with _db_lock:
-            conn = get_conn(DUCKDB_PATH)
+        with get_conn(DATABASE_URL) as conn:
             rows = conn.execute(
                 """
                 SELECT
@@ -568,7 +559,7 @@ async def recent_transactions(limit: int = 20):
                     ingested_at
                 FROM transactions
                 ORDER BY ingested_at DESC
-                LIMIT ?
+                LIMIT %s
             """,
                 [limit],
             ).fetchall()
@@ -590,7 +581,6 @@ async def recent_transactions(limit: int = 20):
             result = []
             for row in rows:
                 d = dict(zip(cols, row, strict=False))
-                # Serialize datetimes
                 for k in ("occurred_at", "ingested_at"):
                     if d[k] is not None:
                         d[k] = d[k].isoformat() if hasattr(d[k], "isoformat") else str(d[k])
@@ -604,9 +594,7 @@ async def recent_transactions(limit: int = 20):
 async def live_stats():
     """Return live aggregate stats for dashboard refresh."""
     try:
-        with _db_lock:
-            conn = get_conn(DUCKDB_PATH)
-
+        with get_conn(DATABASE_URL) as conn:
             total = conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
 
             today = conn.execute("""
@@ -631,15 +619,15 @@ async def live_stats():
             """).fetchall()
 
         return {
-            "total_transactions": total,
+            "total_transactions": int(total or 0),
             "today": {
-                "volume": today[0],
-                "total_usd": round(today[1], 2),
-                "success_rate": round(today[2] * 100, 1),
+                "volume": int(today[0] or 0),
+                "total_usd": round(float(today[1] or 0), 2),
+                "success_rate": round(float(today[2] or 0) * 100, 1),
             },
             "last_ingested": last_ingested.isoformat() if last_ingested else None,
-            "by_source": {r[0]: r[1] for r in by_source},
-            "timestamp": datetime.now().isoformat(),
+            "by_source": {r[0]: int(r[1]) for r in by_source},
+            "timestamp": datetime.now(UTC).isoformat(),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -654,8 +642,7 @@ async def live_stats():
 async def report_executive():
     """Return executive-level KPIs, 30-day financials, and decision highlights."""
     try:
-        with _db_lock:
-            conn = get_conn(DUCKDB_PATH)
+        with get_conn(DATABASE_URL) as conn:
             cash = conn.execute(
                 "SELECT cumulative_cash_usd FROM analytics.daily_cash_position ORDER BY date DESC LIMIT 1"
             ).fetchone()
@@ -668,7 +655,7 @@ async def report_executive():
             burn = conn.execute(
                 "SELECT SUM(outflows_usd) / 30.0 FROM analytics.daily_cash_position WHERE date >= CURRENT_DATE - INTERVAL '30 days'"
             ).fetchone()
-            total_txns = conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
+            total_txns = int(conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0] or 0)
             last_ingested = conn.execute("SELECT MAX(ingested_at) FROM transactions").fetchone()[0]
 
             cash_trend = conn.execute("""
@@ -682,10 +669,10 @@ async def report_executive():
                     [
                         {
                             "date": str(r[0]),
-                            "cash": round(r[1] or 0, 2),
-                            "net": round(r[2] or 0, 2),
-                            "inflows": round(r[3] or 0, 2),
-                            "outflows": round(r[4] or 0, 2),
+                            "cash": round(float(r[1] or 0), 2),
+                            "net": round(float(r[2] or 0), 2),
+                            "inflows": round(float(r[3] or 0), 2),
+                            "outflows": round(float(r[4] or 0), 2),
                         }
                         for r in cash_trend
                     ]
@@ -723,9 +710,9 @@ async def report_executive():
             monthly_comp = conn.execute("""
                 SELECT
                     DATE_TRUNC('month', occurred_at)::DATE AS month,
-                    ROUND(COALESCE(SUM(amount_usd) FILTER (WHERE type IN ('charge', 'invoice_payment') AND status = 'succeeded'), 0.0), 2) AS revenue,
-                    ROUND(COALESCE(SUM(amount_usd) FILTER (WHERE type IN ('payout', 'fee') AND status = 'succeeded'), 0.0) + COALESCE(SUM(amount_usd) FILTER (WHERE type = 'refund' AND status = 'succeeded'), 0.0), 2) AS expenses,
-                    ROUND(COALESCE(SUM(net_amount_usd) FILTER (WHERE status = 'succeeded'), 0.0), 2) AS net_profit
+                    ROUND(COALESCE(SUM(amount_usd) FILTER (WHERE type IN ('charge', 'invoice_payment') AND status = 'succeeded'), 0.0)::numeric, 2)::double precision AS revenue,
+                    ROUND((COALESCE(SUM(amount_usd) FILTER (WHERE type IN ('payout', 'fee') AND status = 'succeeded'), 0.0) + COALESCE(SUM(amount_usd) FILTER (WHERE type = 'refund' AND status = 'succeeded'), 0.0))::numeric, 2)::double precision AS expenses,
+                    ROUND(COALESCE(SUM(net_amount_usd) FILTER (WHERE status = 'succeeded'), 0.0)::numeric, 2)::double precision AS net_profit
                 FROM transactions
                 WHERE occurred_at IS NOT NULL
                 GROUP BY DATE_TRUNC('month', occurred_at)
@@ -738,11 +725,13 @@ async def report_executive():
                     [
                         {
                             "month": str(r[0])[:7],
-                            "revenue": round(r[1] or 0.0, 2),
-                            "expenses": round(r[2] or 0.0, 2),
-                            "net_profit": round(r[3] or 0.0, 2),
-                            "margin_pct": round(((r[3] or 0.0) / (r[1] or 1.0)) * 100.0, 1)
-                            if (r[1] or 0.0) > 0
+                            "revenue": round(float(r[1] or 0.0), 2),
+                            "expenses": round(float(r[2] or 0.0), 2),
+                            "net_profit": round(float(r[3] or 0.0), 2),
+                            "margin_pct": round(
+                                ((float(r[3] or 0.0)) / (float(r[1] or 1.0))) * 100.0, 1
+                            )
+                            if float(r[1] or 0.0) > 0
                             else 0.0,
                         }
                         for r in monthly_comp
@@ -777,8 +766,8 @@ async def report_executive():
             dispute_amount = float(disputes_stats[1] or 0.0) if disputes_stats else 0.0
 
             # Dynamic Decision-Oriented Business Alerts
-            runway_days = runway[0] if runway else 0
-            gw_rate = round((success_rate[0] or 0) * 100, 1) if success_rate else 0.0
+            runway_days = int(runway[0]) if runway and runway[0] is not None else 0
+            gw_rate = round(float(success_rate[0] or 0) * 100, 1) if success_rate else 0.0
 
             alerts = []
             if runway_days >= 180:
@@ -876,10 +865,10 @@ async def report_executive():
                 )
 
         return {
-            "current_cash": round(cash[0] or 0, 2) if cash else 0,
+            "current_cash": round(float(cash[0] or 0), 2) if cash else 0,
             "runway_p50": runway_days,
             "success_rate_24h": gw_rate,
-            "net_burn_30d": round(burn[0] or 0, 2) if burn else 0,
+            "net_burn_30d": round(float(burn[0] or 0), 2) if burn else 0,
             "total_transactions": total_txns,
             "last_ingested": last_ingested.isoformat() if last_ingested else None,
             "cash_trend": cash_trend,
@@ -910,8 +899,7 @@ async def report_executive():
 async def report_cashflow():
     """Return 13-week ML forecast fan chart data, weekly flows, breakdowns, scenarios, and trends."""
     try:
-        with _db_lock:
-            conn = get_conn(DUCKDB_PATH)
+        with get_conn(DATABASE_URL) as conn:
             forecast = conn.execute("""
                 SELECT
                     prediction_date,
@@ -941,9 +929,9 @@ async def report_cashflow():
                     [
                         {
                             "week": str(r[0]),
-                            "inflows": round(r[1] or 0, 2),
-                            "outflows": round(r[2] or 0, 2),
-                            "net": round(r[3] or 0, 2),
+                            "inflows": round(float(r[1] or 0), 2),
+                            "outflows": round(float(r[2] or 0), 2),
+                            "net": round(float(r[3] or 0), 2),
                         }
                         for r in weekly
                     ]
@@ -970,7 +958,7 @@ async def report_cashflow():
                     FROM analytics.daily_cash_position
                     ORDER BY date DESC
                     LIMIT 30
-                )
+                ) AS sub
             """).fetchone()
             inflows_30d = round(float(flow_30d[0] or 0.0), 2) if flow_30d else 0.0
             outflows_30d = round(float(flow_30d[1] or 0.0), 2) if flow_30d else 0.0
@@ -979,21 +967,21 @@ async def report_cashflow():
             # Inflows breakdown by product line / source
             inflow_rows = conn.execute("""
                 SELECT
-                    COALESCE(product_line, 'Direct Payments') as product,
-                    ROUND(SUM(amount_usd), 2) as total_usd
+                    COALESCE(product_line, 'Direct Payments') AS product,
+                    ROUND(SUM(amount_usd)::numeric, 2)::double precision AS total_usd
                 FROM transactions
                 WHERE type IN ('charge', 'invoice_payment')
                   AND status = 'succeeded'
-                  AND occurred_date >= (SELECT MAX(occurred_date) - INTERVAL 30 DAY FROM transactions)
+                  AND occurred_date >= (SELECT MAX(occurred_date) - INTERVAL '30 days' FROM transactions)
                 GROUP BY product
                 ORDER BY total_usd DESC
             """).fetchall()
-            total_in = sum(r[1] for r in inflow_rows) or 1.0
+            total_in = sum(float(r[1] or 0) for r in inflow_rows) or 1.0
             inflows_breakdown = [
                 {
                     "category": r[0].replace("_", " ").title(),
-                    "amount": round(r[1], 2),
-                    "percentage": round((r[1] / total_in) * 100, 1),
+                    "amount": round(float(r[1] or 0), 2),
+                    "percentage": round((float(r[1] or 0) / total_in) * 100, 1),
                 }
                 for r in inflow_rows
             ]
@@ -1001,15 +989,15 @@ async def report_cashflow():
             # Outflows breakdown by use / category
             outflow_rows = conn.execute("""
                 SELECT
-                    type as category,
-                    ROUND(SUM(amount_usd), 2) as total_usd
+                    type AS category,
+                    ROUND(SUM(amount_usd)::numeric, 2)::double precision AS total_usd
                 FROM transactions
                 WHERE type IN ('refund', 'fee', 'payout', 'transfer', 'adjustment')
-                  AND occurred_date >= (SELECT MAX(occurred_date) - INTERVAL 30 DAY FROM transactions)
+                  AND occurred_date >= (SELECT MAX(occurred_date) - INTERVAL '30 days' FROM transactions)
                 GROUP BY category
                 ORDER BY total_usd DESC
             """).fetchall()
-            total_out = sum(r[1] for r in outflow_rows) or 1.0
+            total_out = sum(float(r[1] or 0) for r in outflow_rows) or 1.0
             label_map = {
                 "payout": "Vendor & Merchant Payouts",
                 "fee": "Gateway & Processing Fees",
@@ -1020,29 +1008,31 @@ async def report_cashflow():
             outflows_breakdown = [
                 {
                     "category": label_map.get(r[0], r[0].title()),
-                    "amount": round(r[1], 2),
-                    "percentage": round((r[1] / total_out) * 100, 1),
+                    "amount": round(float(r[1] or 0), 2),
+                    "percentage": round((float(r[1] or 0) / total_out) * 100, 1),
                 }
                 for r in outflow_rows
             ]
 
             # Operating and Free cash flow calculations
-            charges_in = sum(r[1] for r in inflow_rows)
-            fees_out = sum(r[1] for r in outflow_rows if r[0] in ("fee", "refund"))
-            payouts_out = sum(r[1] for r in outflow_rows if r[0] in ("payout", "transfer"))
+            charges_in = sum(float(r[1] or 0) for r in inflow_rows)
+            fees_out = sum(float(r[1] or 0) for r in outflow_rows if r[0] in ("fee", "refund"))
+            payouts_out = sum(
+                float(r[1] or 0) for r in outflow_rows if r[0] in ("payout", "transfer")
+            )
             operating_cash_flow_30d = round(charges_in - fees_out, 2)
             free_cash_flow_30d = round(operating_cash_flow_30d - payouts_out, 2)
 
             # Historical Monthly Cash Flow Trends (12 months)
             monthly_rows = conn.execute("""
                 SELECT
-                    STRFTIME(date, '%Y-%m') as month,
-                    ROUND(SUM(inflows_usd), 2) as inflows,
-                    ROUND(SUM(outflows_usd), 2) as outflows,
-                    ROUND(SUM(net_flow_usd), 2) as net_flow,
-                    ROUND(LAST(cumulative_cash_usd ORDER BY date), 2) as ending_cash
+                    TO_CHAR(date, 'YYYY-MM') AS month,
+                    ROUND(SUM(inflows_usd)::numeric, 2)::double precision AS inflows,
+                    ROUND(SUM(outflows_usd)::numeric, 2)::double precision AS outflows,
+                    ROUND(SUM(net_flow_usd)::numeric, 2)::double precision AS net_flow,
+                    ROUND(((ARRAY_AGG(cumulative_cash_usd ORDER BY date DESC))[1])::numeric, 2)::double precision AS ending_cash
                 FROM analytics.daily_cash_position
-                GROUP BY STRFTIME(date, '%Y-%m')
+                GROUP BY TO_CHAR(date, 'YYYY-MM')
                 ORDER BY month DESC
                 LIMIT 12
             """).fetchall()
@@ -1064,11 +1054,11 @@ async def report_cashflow():
             # Historical Quarterly Cash Flow Trends (5 quarters)
             quarterly_rows = conn.execute("""
                 SELECT
-                    CAST(EXTRACT(YEAR FROM date) AS VARCHAR) || '-Q' || CAST(EXTRACT(QUARTER FROM date) AS VARCHAR) as quarter,
-                    ROUND(SUM(inflows_usd), 2) as inflows,
-                    ROUND(SUM(outflows_usd), 2) as outflows,
-                    ROUND(SUM(net_flow_usd), 2) as net_flow,
-                    ROUND(LAST(cumulative_cash_usd ORDER BY date), 2) as ending_cash
+                    CAST(EXTRACT(YEAR FROM date)::INT AS VARCHAR) || '-Q' || CAST(EXTRACT(QUARTER FROM date)::INT AS VARCHAR) AS quarter,
+                    ROUND(SUM(inflows_usd)::numeric, 2)::double precision AS inflows,
+                    ROUND(SUM(outflows_usd)::numeric, 2)::double precision AS outflows,
+                    ROUND(SUM(net_flow_usd)::numeric, 2)::double precision AS net_flow,
+                    ROUND(((ARRAY_AGG(cumulative_cash_usd ORDER BY date DESC))[1])::numeric, 2)::double precision AS ending_cash
                 FROM analytics.daily_cash_position
                 GROUP BY quarter
                 ORDER BY quarter DESC
@@ -1102,7 +1092,7 @@ async def report_cashflow():
                     FROM analytics.daily_cash_position
                     ORDER BY date DESC
                     LIMIT 30
-                )
+                ) AS sub
                 ORDER BY date ASC
             """).fetchall()
             actual_history_30d = [
@@ -1131,19 +1121,18 @@ async def report_cashflow():
         forecast_list = [
             {
                 "date": str(r[0]),
-                "p10": round(r[1] or 0, 2),
-                "p50": round(r[2] or 0, 2),
-                "p90": round(r[3] or 0, 2),
-                "inflows": round(r[4] or 0, 2),
-                "outflows": round(r[5] or 0, 2),
+                "p10": round(float(r[1] or 0), 2),
+                "p50": round(float(r[2] or 0), 2),
+                "p90": round(float(r[3] or 0), 2),
+                "inflows": round(float(r[4] or 0), 2),
+                "outflows": round(float(r[5] or 0), 2),
             }
             for r in forecast
         ]
 
         # If no ML forecast has been run yet, generate baseline projection from daily cash position
         if not forecast_list:
-            with contextlib.suppress(Exception), _db_lock:
-                conn = get_conn(DUCKDB_PATH)
+            with contextlib.suppress(Exception), get_conn(DATABASE_URL) as conn:
                 last_pos = conn.execute("""
                         SELECT date, cumulative_cash_usd
                         FROM analytics.daily_cash_position
@@ -1163,7 +1152,7 @@ async def report_cashflow():
                                 SELECT inflows_usd, outflows_usd, net_flow_usd
                                 FROM analytics.daily_cash_position
                                 ORDER BY date DESC LIMIT 30
-                            )
+                            ) AS sub
                         """).fetchone()
                     avg_in = float(pos_summary[0] or 0.0) if pos_summary else 0.0
                     avg_out = float(pos_summary[1] or 0.0) if pos_summary else 0.0
@@ -1263,8 +1252,7 @@ async def report_cashflow():
 async def report_revenue():
     """Return comprehensive CFO Strategic Financial Intelligence telemetry, P&L, expense breakdowns, segmentation, budget vs actual, and forecasting."""
     try:
-        with _db_lock:
-            conn = get_conn(DUCKDB_PATH)
+        with get_conn(DATABASE_URL) as conn:
             rev = conn.execute("""
                 SELECT month, product_line, revenue_usd, net_revenue_usd
                 FROM analytics.revenue_by_product
@@ -1278,22 +1266,22 @@ async def report_revenue():
             """).fetchall()
 
             # 1. Total revenue, net revenue, and gross margin
-            total_gross = sum(r[2] or 0 for r in rev)
-            total_net = sum(r[3] or 0 for r in rev)
+            total_gross = sum(float(r[2] or 0) for r in rev)
+            total_net = sum(float(r[3] or 0) for r in rev)
             gross_margin_pct = round((total_net / total_gross * 100), 1) if total_gross else 0.0
 
             # 2. Expenses breakdown by department
             exp_dept_rows = conn.execute("""
                 SELECT
-                    COALESCE(department, 'operations') as dept,
-                    ROUND(SUM(amount_usd), 2) as total_usd,
-                    COUNT(*) as count
+                    COALESCE(department, 'operations') AS dept,
+                    ROUND(SUM(amount_usd)::numeric, 2)::double precision AS total_usd,
+                    COUNT(*) AS count
                 FROM transactions
                 WHERE type IN ('refund', 'fee', 'payout', 'transfer')
                 GROUP BY dept
                 ORDER BY total_usd DESC
             """).fetchall()
-            total_opex = sum(r[1] for r in exp_dept_rows) or 1.0
+            total_opex = sum(float(r[1] or 0) for r in exp_dept_rows) or 1.0
 
             dept_labels = {
                 "engineering": "Engineering & R&D",
@@ -1308,8 +1296,8 @@ async def report_revenue():
                 {
                     "department": dept_labels.get(r[0].lower(), r[0].title()),
                     "key": r[0].lower(),
-                    "amount_usd": round(r[1], 2),
-                    "percentage": round((r[1] / total_opex) * 100, 1),
+                    "amount_usd": round(float(r[1] or 0), 2),
+                    "percentage": round((float(r[1] or 0) / total_opex) * 100, 1),
                 }
                 for r in exp_dept_rows
             ]
@@ -1317,10 +1305,10 @@ async def report_revenue():
             # 3. Revenue by Customer Tier
             tier_rows = conn.execute("""
                 SELECT
-                    COALESCE(c.plan, 'standard') as customer_tier,
-                    COUNT(DISTINCT c.customer_id) as customer_count,
-                    ROUND(SUM(t.amount_usd), 2) as total_usd,
-                    COUNT(*) as tx_count
+                    COALESCE(c.plan, 'standard') AS customer_tier,
+                    COUNT(DISTINCT c.customer_id) AS customer_count,
+                    ROUND(SUM(t.amount_usd)::numeric, 2)::double precision AS total_usd,
+                    COUNT(*) AS tx_count
                 FROM transactions t
                 JOIN customers c ON t.customer_id = c.customer_id
                 WHERE t.type IN ('charge', 'invoice_payment')
@@ -1328,7 +1316,7 @@ async def report_revenue():
                 GROUP BY customer_tier
                 ORDER BY total_usd DESC
             """).fetchall()
-            total_tier_rev = sum(r[2] for r in tier_rows) or 1.0
+            total_tier_rev = sum(float(r[2] or 0) for r in tier_rows) or 1.0
 
             tier_labels = {
                 "enterprise": "Enterprise Tier",
@@ -1342,8 +1330,8 @@ async def report_revenue():
                     "tier": tier_labels.get(r[0].lower(), r[0].title()),
                     "plan_key": r[0].lower(),
                     "customer_count": int(r[1]),
-                    "total_revenue": round(r[2], 2),
-                    "percentage": round((r[2] / total_tier_rev) * 100, 1),
+                    "total_revenue": round(float(r[2] or 0), 2),
+                    "percentage": round((float(r[2] or 0) / total_tier_rev) * 100, 1),
                     "transactions_count": int(r[3]),
                 }
                 for r in tier_rows
@@ -1355,8 +1343,8 @@ async def report_revenue():
                     c.customer_name,
                     c.plan,
                     c.country,
-                    ROUND(SUM(t.amount_usd), 2) as total_usd,
-                    COUNT(*) as transactions_count
+                    ROUND(SUM(t.amount_usd)::numeric, 2)::double precision AS total_usd,
+                    COUNT(*) AS transactions_count
                 FROM transactions t
                 JOIN customers c ON t.customer_id = c.customer_id
                 WHERE t.type IN ('charge', 'invoice_payment')
@@ -1371,7 +1359,7 @@ async def report_revenue():
                     "name": r[0],
                     "tier": tier_labels.get(r[1].lower(), r[1].title()),
                     "country": r[2],
-                    "total_revenue": round(r[3], 2),
+                    "total_revenue": round(float(r[3] or 0), 2),
                     "transactions_count": int(r[4]),
                 }
                 for r in top_cust_rows
@@ -1380,11 +1368,11 @@ async def report_revenue():
             # 5. Financial Performance Trends (12 Months)
             monthly_perf_rows = conn.execute("""
                 SELECT
-                    STRFTIME(month, '%Y-%m') as mo,
-                    ROUND(SUM(revenue_usd), 2) as gross_rev,
-                    ROUND(SUM(net_revenue_usd), 2) as net_rev
+                    TO_CHAR(month, 'YYYY-MM') AS mo,
+                    ROUND(SUM(revenue_usd)::numeric, 2)::double precision AS gross_rev,
+                    ROUND(SUM(net_revenue_usd)::numeric, 2)::double precision AS net_rev
                 FROM analytics.revenue_by_product
-                GROUP BY STRFTIME(month, '%Y-%m')
+                GROUP BY TO_CHAR(month, 'YYYY-MM')
                 ORDER BY mo DESC
                 LIMIT 12
             """).fetchall()
@@ -1431,7 +1419,7 @@ async def report_revenue():
                 SELECT SUM(net_flow_usd)
                 FROM (
                     SELECT net_flow_usd FROM analytics.daily_cash_position ORDER BY date DESC LIMIT 30
-                )
+                ) AS sub
             """).fetchone()
             cash_flow_net_30d = round(float(cf_row[0] or 0.0), 2) if cf_row else 0.0
 
@@ -1558,13 +1546,14 @@ async def report_revenue():
                 {
                     "month": str(r[0]),
                     "product_line": r[1],
-                    "revenue": round(r[2] or 0, 2),
-                    "net_revenue": round(r[3] or 0, 2),
+                    "revenue": round(float(r[2] or 0), 2),
+                    "net_revenue": round(float(r[3] or 0), 2),
                 }
                 for r in rev
             ],
             "monthly_pl": [
-                {"month": str(r[0]), "account_code": r[1], "net": round(r[2] or 0, 2)} for r in pl
+                {"month": str(r[0]), "account_code": r[1], "net": round(float(r[2] or 0), 2)}
+                for r in pl
             ],
             "financial_summary": financial_summary,
             "revenue_by_customer_tier": revenue_by_customer_tier,
@@ -1583,8 +1572,7 @@ async def report_revenue():
 async def report_ops():
     """Return Modern AI Operations Console metrics: transaction monitoring, anomaly detection, payment processing, fraud/risk indicators, automation performance, and AI recommendations."""
     try:
-        with _db_lock:
-            conn = get_conn(DUCKDB_PATH)
+        with get_conn(DATABASE_URL) as conn:
             success_trend = conn.execute("""
                 SELECT occurred_date, source, success_rate
                 FROM analytics.success_rate_daily
@@ -1629,12 +1617,12 @@ async def report_ops():
             # 1. Real-time Transaction Monitoring
             tx_stats = conn.execute("""
                 SELECT
-                    COUNT(*) as total_tx,
-                    ROUND(SUM(amount_usd), 2) as total_volume,
-                    SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END) as succeeded,
-                    SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
-                    SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
-                    SUM(CASE WHEN status = 'disputed' THEN 1 ELSE 0 END) as disputed
+                    COUNT(*) AS total_tx,
+                    ROUND(SUM(amount_usd)::numeric, 2)::double precision AS total_volume,
+                    SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END) AS succeeded,
+                    SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed,
+                    SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending,
+                    SUM(CASE WHEN status = 'disputed' THEN 1 ELSE 0 END) AS disputed
                 FROM transactions
             """).fetchone()
 
@@ -1650,9 +1638,9 @@ async def report_ops():
             gateway_rows = conn.execute("""
                 SELECT
                     source,
-                    COUNT(*) as total_tx,
-                    ROUND(SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) as success_pct,
-                    ROUND(SUM(amount_usd), 2) as total_usd
+                    COUNT(*) AS total_tx,
+                    ROUND((SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END) * 100.0 / COUNT(*))::numeric, 1)::double precision AS success_pct,
+                    ROUND(SUM(amount_usd)::numeric, 2)::double precision AS total_usd
                 FROM transactions
                 GROUP BY source
                 ORDER BY total_tx DESC
@@ -1672,10 +1660,10 @@ async def report_ops():
                     "source": r[0],
                     "name": source_labels.get(r[0], r[0].title()),
                     "total_transactions": int(r[1]),
-                    "success_rate": float(r[2]),
-                    "volume_usd": float(r[3]),
+                    "success_rate": float(r[2] or 0),
+                    "volume_usd": float(r[3] or 0),
                     "avg_latency_ms": 142 if r[0] == "stripe" else 85 if r[0] == "plaid" else 115,
-                    "health_status": "Optimal" if r[2] >= 93 else "Degraded",
+                    "health_status": "Optimal" if float(r[2] or 0) >= 93 else "Degraded",
                 }
                 for r in gateway_rows
             ]
@@ -1683,9 +1671,9 @@ async def report_ops():
             # 3. Fraud / Risk Indicators
             risk_counts = conn.execute("""
                 SELECT
-                    SUM(CASE WHEN risk_level = 'normal' OR risk_level IS NULL THEN 1 ELSE 0 END) as normal_cnt,
-                    SUM(CASE WHEN risk_level = 'elevated' THEN 1 ELSE 0 END) as elevated_cnt,
-                    SUM(CASE WHEN risk_level = 'highest' THEN 1 ELSE 0 END) as highest_cnt
+                    SUM(CASE WHEN risk_level = 'normal' OR risk_level IS NULL THEN 1 ELSE 0 END) AS normal_cnt,
+                    SUM(CASE WHEN risk_level = 'elevated' THEN 1 ELSE 0 END) AS elevated_cnt,
+                    SUM(CASE WHEN risk_level = 'highest' THEN 1 ELSE 0 END) AS highest_cnt
                 FROM transactions
             """).fetchone()
             normal_cnt = int(risk_counts[0] or 0)
@@ -1700,7 +1688,7 @@ async def report_ops():
                     SUM(CASE WHEN dispute_status = 'won' THEN 1 ELSE 0 END),
                     SUM(CASE WHEN dispute_status = 'lost' THEN 1 ELSE 0 END),
                     SUM(CASE WHEN dispute_status LIKE 'warning%' THEN 1 ELSE 0 END),
-                    ROUND(SUM(amount_usd), 2)
+                    ROUND(SUM(amount_usd)::numeric, 2)::double precision
                 FROM analytics.disputes
             """).fetchone()
             disp_won = int(disp_counts[0] or 0)
@@ -1717,9 +1705,9 @@ async def report_ops():
             retry_summary = conn.execute("""
                 SELECT
                     COUNT(*),
-                    ROUND(SUM(expected_recovery_usd), 2),
+                    ROUND(SUM(expected_recovery_usd)::numeric, 2)::double precision,
                     SUM(CASE WHEN retry_success_probability >= 0.7 THEN 1 ELSE 0 END),
-                    ROUND(AVG(retry_success_probability) * 100, 1)
+                    ROUND((AVG(retry_success_probability) * 100)::numeric, 1)::double precision
                 FROM ml.decline_predictions
             """).fetchone()
 
@@ -1852,10 +1840,10 @@ async def report_ops():
                     "decline_code": r[1],
                     "brand": r[2],
                     "funding": r[3],
-                    "amount_usd": round(r[4] or 0, 2),
-                    "probability": round((r[5] or 0) * 100, 1),
+                    "amount_usd": round(float(r[4] or 0), 2),
+                    "probability": round(float(r[5] or 0) * 100, 1),
                     "action": r[6],
-                    "recovery_usd": round(r[7] or 0, 2),
+                    "recovery_usd": round(float(r[7] or 0), 2),
                 }
                 for r in advisor
             ],
@@ -1864,7 +1852,7 @@ async def report_ops():
                     "dispute_id": r[0],
                     "transaction_id": r[1],
                     "customer_id": r[2],
-                    "amount_usd": round(r[3] or 0, 2),
+                    "amount_usd": round(float(r[3] or 0), 2),
                     "status": r[4],
                     "created_at": str(r[5]) if r[5] else None,
                     "due_by": str(r[6]) if r[6] else None,
@@ -1886,9 +1874,7 @@ async def report_ops():
 async def report_ar_aging():
     """Return accounts receivable aging report with collections & risk management analytics."""
     try:
-        with _db_lock:
-            conn = get_conn(DUCKDB_PATH)
-
+        with get_conn(DATABASE_URL) as conn:
             # 1. Total Aggregates
             agg = conn.execute("""
                 SELECT
@@ -2284,9 +2270,8 @@ async def plaid_webhook(
 async def health_check():
     """Health check for container orchestration."""
     try:
-        with _db_lock:
-            conn = get_conn(DUCKDB_PATH)
-            count = conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
+        with get_conn(DATABASE_URL) as conn:
+            count = int(conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0] or 0)
         return {"status": "healthy", "transactions": count, "demo_mode": DEMO_MODE}
     except Exception as e:
         return {"status": "unhealthy", "error": str(e)}
@@ -2296,8 +2281,7 @@ async def health_check():
 async def metrics():
     """Basic metrics for monitoring."""
     try:
-        with _db_lock:
-            conn = get_conn(DUCKDB_PATH)
+        with get_conn(DATABASE_URL) as conn:
             recent = conn.execute("""
                 SELECT source, status, COUNT(*) AS count
                 FROM transactions
@@ -2306,7 +2290,7 @@ async def metrics():
             """).fetchall()
         return {
             "recent_transactions": [
-                {"source": r[0], "status": r[1], "count": r[2]} for r in recent
+                {"source": r[0], "status": r[1], "count": int(r[2])} for r in recent
             ],
             "timestamp": datetime.now(UTC).isoformat(),
         }
@@ -2321,7 +2305,7 @@ async def metrics():
 
 async def _ingest_single(transaction: dict):
     try:
-        count = upsert_transactions([transaction], DUCKDB_PATH)
+        count = upsert_transactions([transaction], DATABASE_URL)
         console.log(
             f"[green]Ingested[/green] {transaction['transaction_id']} "
             f"(total {transaction['source']}: {count})"
@@ -2356,7 +2340,7 @@ async def _sync_plaid_item(item_id: str):
                 transactions.append(normalized)
 
         if transactions:
-            count = upsert_transactions(transactions, DUCKDB_PATH)
+            count = upsert_transactions(transactions, DATABASE_URL)
             console.log(f"[green]Plaid sync complete:[/green] {count} transactions for {item_id}")
 
     except Exception as e:
@@ -2365,11 +2349,10 @@ async def _sync_plaid_item(item_id: str):
 
 async def _remove_plaid_transactions(transaction_ids: list[str]):
     try:
-        with _db_lock:
-            conn = get_conn(DUCKDB_PATH)
+        with get_conn(DATABASE_URL) as conn:
             for txn_id in transaction_ids:
                 conn.execute(
-                    "UPDATE transactions SET status = 'removed' WHERE transaction_id = ?",
+                    "UPDATE transactions SET status = 'removed' WHERE transaction_id = %s",
                     [f"plaid_{txn_id}"],
                 )
         console.log(f"[yellow]Marked {len(transaction_ids)} Plaid transactions as removed[/yellow]")
@@ -2397,7 +2380,7 @@ def main():
     console.log(f"Starting on http://{args.host}:{args.port}")
     console.log(f"Live Input UI: http://localhost:{args.port}/")
     console.log(f"API Docs:      http://localhost:{args.port}/docs")
-    console.log(f"DuckDB:        {DUCKDB_PATH}")
+    console.log(f"Database:      PostgreSQL ({'configured' if DATABASE_URL else 'NOT SET'})")
     console.log(f"Demo mode:     {'ON' if DEMO_MODE else 'OFF'} (set DEMO_MODE=false to disable)")
     console.log(f"Stripe secret: {'configured' if STRIPE_WEBHOOK_SECRET else 'not set (dev mode)'}")
 

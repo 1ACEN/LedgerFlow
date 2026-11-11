@@ -2,7 +2,7 @@
 LedgerFlow Authentication & User Database Management
 
 Provides secure password hashing (PBKDF2 HMAC SHA-256 with salt),
-user registration, authentication against DuckDB, and seeding of initial credentials.
+user registration, authentication against PostgreSQL, and seeding of initial credentials.
 """
 
 from __future__ import annotations
@@ -82,7 +82,6 @@ def init_users_table(conn: Any) -> None:
         """
     )
 
-    # Check if empty
     count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
     if count == 0:
         for u in DEFAULT_USERS:
@@ -91,20 +90,21 @@ def init_users_table(conn: Any) -> None:
             conn.execute(
                 """
                 INSERT INTO users (user_id, username, password_hash, salt, full_name, role_id)
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (username) DO NOTHING
                 """,
                 [user_id, u["username"].lower(), pwd_hash, salt, u["full_name"], u["role_id"]],
             )
 
 
 def authenticate_user(conn: Any, username: str, password: str) -> dict[str, Any] | None:
-    """Validate credentials against DuckDB users table."""
+    """Validate credentials against PostgreSQL users table."""
     clean_user = username.strip().lower()
     row = conn.execute(
         """
         SELECT user_id, username, password_hash, salt, full_name, role_id
         FROM users
-        WHERE LOWER(username) = ?
+        WHERE LOWER(username) = %s
         """,
         [clean_user],
     ).fetchone()
@@ -131,7 +131,7 @@ def register_user(
     full_name: str,
     role_id: str,
 ) -> tuple[dict[str, Any] | None, str | None]:
-    """Register a new user in DuckDB. Returns (user_dict, error_message)."""
+    """Register a new user in PostgreSQL. Returns (user_dict, error_message)."""
     clean_user = username.strip().lower()
     if not clean_user or len(clean_user) < 3:
         return None, "Username must be at least 3 characters long."
@@ -146,9 +146,8 @@ def register_user(
     if role_id not in valid_roles:
         return None, f"Invalid role. Must be one of: {', '.join(sorted(valid_roles))}"
 
-    # Check for existing username
     existing = conn.execute(
-        "SELECT COUNT(*) FROM users WHERE LOWER(username) = ?",
+        "SELECT COUNT(*) FROM users WHERE LOWER(username) = %s",
         [clean_user],
     ).fetchone()[0]
 
@@ -161,7 +160,7 @@ def register_user(
     conn.execute(
         """
         INSERT INTO users (user_id, username, password_hash, salt, full_name, role_id)
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s)
         """,
         [user_id, clean_user, pwd_hash, salt, full_name.strip(), role_id],
     )
