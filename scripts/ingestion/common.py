@@ -1,36 +1,20 @@
 #!/usr/bin/env python3
 """
 LedgerFlow: Shared Ingestion Logic
-Common functions for both batch and real-time ingestion.
+Common functions for both batch and real-time ingestion (PostgreSQL).
 """
 
-import threading
-from datetime import datetime
-from pathlib import Path
+from __future__ import annotations
 
-import duckdb
+import json
+from datetime import UTC, datetime
+
 import polars as pl
 from rich.console import Console
 
+from scripts.db.connection import copy_upsert_dataframe, get_conn
+
 console = Console()
-
-# =============================================================================
-# SINGLETON DB CONNECTION MANAGER
-# Solves DuckDB's single-writer exclusive lock when multiple threads/coroutines
-# try to open the same file simultaneously.
-# =============================================================================
-
-_db_lock = threading.Lock()
-_conn: dict[str, duckdb.DuckDBPyConnection] = {}
-
-
-def get_conn(db_path: Path) -> duckdb.DuckDBPyConnection:
-    """Return (and cache) a single shared DuckDB connection for db_path."""
-    key = str(db_path.resolve())
-    if key not in _conn or not _conn[key]:
-        _conn[key] = duckdb.connect(str(db_path))
-    return _conn[key]
-
 
 # =============================================================================
 # TYPE/STATUS MAPPINGS (shared with ingest_stripe.py)
@@ -64,9 +48,7 @@ STATUS_MAP = {
 def _date_fields(dt: datetime) -> dict:
     """
     Compute all derived date/time columns from a datetime.
-    DuckDB schema stores these as separate SMALLINT / DATE columns
-    so they must be set explicitly on every INSERT — they are NOT
-    generated columns and there is no trigger to backfill them.
+    PostgreSQL schema stores these as separate SMALLINT / DATE columns.
     """
     # Python's weekday(): Mon=0 … Sun=6  →  we want Sun=0 … Sat=6
     dow = (dt.weekday() + 1) % 7  # Sun=0
@@ -88,7 +70,7 @@ def _date_fields(dt: datetime) -> dict:
 # CORE WRITE FUNCTION
 # =============================================================================
 
-# Columns that are GENERATED ALWAYS in DuckDB — computed automatically from amount * fx_rate / 100.0
+# Columns that are GENERATED ALWAYS ... STORED in PostgreSQL
 _GENERATED_COLS = {"amount_usd", "net_amount_usd", "fee_amount_usd"}
 
 # Explicit ordered list of insertable columns (matches schema in init_db.py)
@@ -132,9 +114,9 @@ _INSERT_COLS = [
 ]
 
 
-def upsert_transactions(transactions: list[dict], db_path: Path) -> int:
+def upsert_transactions(transactions: list[dict], db_url: str | None = None) -> int:
     """
-    Upsert transactions into DuckDB using idempotency_key for deduplication.
+    Upsert transactions into PostgreSQL using transaction_id conflict handling.
     Returns total count of transactions from this source after write.
     """
     if not transactions:
@@ -147,11 +129,17 @@ def upsert_transactions(transactions: list[dict], db_path: Path) -> int:
             row.setdefault(col, None)
         if row.get("is_recurring") is None:
             row["is_recurring"] = False
-        clean.append(row)
+        if row.get("metadata_json") is not None and not isinstance(row["metadata_json"], str):
+            row["metadata_json"] = json.dumps(row["metadata_json"])
+        clean.append({col: row[col] for col in _INSERT_COLS})
 
     df = pl.DataFrame(
         clean,
         schema_overrides={
+            "transaction_id": pl.String,
+            "idempotency_key": pl.String,
+            "occurred_at": pl.Datetime("us", "UTC"),
+            "posted_at": pl.Datetime("us", "UTC"),
             "occurred_date": pl.Date,
             "posted_date": pl.Date,
             "occurred_hour": pl.Int16,
@@ -160,54 +148,61 @@ def upsert_transactions(transactions: list[dict], db_path: Path) -> int:
             "occurred_month": pl.Int16,
             "occurred_quarter": pl.Int16,
             "occurred_year": pl.Int16,
+            "type": pl.String,
+            "status": pl.String,
+            "source": pl.String,
             "amount": pl.Int64,
+            "currency": pl.String,
+            "fx_rate": pl.Float64,
             "net_amount": pl.Int64,
             "fee_amount": pl.Int64,
-            "fx_rate": pl.Float64,
+            "customer_id": pl.String,
+            "merchant_account_id": pl.String,
+            "product_line": pl.String,
+            "department": pl.String,
+            "account_code": pl.String,
+            "cost_center": pl.String,
+            "basis": pl.String,
+            "decline_code": pl.String,
+            "risk_level": pl.String,
+            "dispute_id": pl.String,
+            "dispute_status": pl.String,
             "is_recurring": pl.Boolean,
+            "description": pl.String,
+            "metadata_json": pl.String,
+            "ingested_at": pl.Datetime("us", "UTC"),
+            "batch_id": pl.String,
         },
+        strict=False,
     )
 
-    col_list = ", ".join(_INSERT_COLS)
-    update_set = ", ".join(
-        f"{c} = EXCLUDED.{c}"
-        for c in [
-            "status",
-            "posted_at",
-            "posted_date",
-            "net_amount",
-            "fee_amount",
-            "dispute_id",
-            "dispute_status",
-            "ingested_at",
-            "batch_id",
-        ]
-    )
+    update_cols = [
+        "status",
+        "posted_at",
+        "posted_date",
+        "net_amount",
+        "fee_amount",
+        "dispute_id",
+        "dispute_status",
+        "ingested_at",
+        "batch_id",
+    ]
 
-    with _db_lock:
-        conn = get_conn(db_path)
+    with get_conn(db_url) as conn:
+        copy_upsert_dataframe(
+            conn,
+            "transactions",
+            df,
+            conflict_cols=["transaction_id"],
+            update_cols=update_cols,
+        )
 
-        # DuckDB v1.5: ON CONFLICT upserts need an explicit UNIQUE INDEX.
-        conn.execute("""
-            CREATE UNIQUE INDEX IF NOT EXISTS ux_transactions_id
-            ON transactions(transaction_id)
-        """)
-
-        conn.register("staging_txns", df)
-        conn.execute(f"""
-            INSERT INTO transactions ({col_list})
-            SELECT {col_list} FROM staging_txns
-            ON CONFLICT (transaction_id) DO UPDATE SET
-                {update_set}
-        """)
-
-        # Get source from first transaction to count
         source = transactions[0].get("source", "unknown")
         count = conn.execute(
-            "SELECT COUNT(*) FROM transactions WHERE source = ?", [source]
+            "SELECT COUNT(*) FROM transactions WHERE source = %s", [source]
         ).fetchone()[0]
 
-    return count
+    return int(count or 0)
 
 
 # =============================================================================
@@ -221,7 +216,7 @@ def normalize_stripe_event(event: dict, stripe_account_id: str) -> dict | None:
     Works for both batch (Event object) and webhook (raw dict).
     """
     evt_type = event.get("type")
-    obj = event.get("data", {}).get("object", event)  # Handle both formats
+    obj = event.get("data", {}).get("object", event)
 
     if evt_type not in TYPE_MAP:
         return None
@@ -231,41 +226,25 @@ def normalize_stripe_event(event: dict, stripe_account_id: str) -> dict | None:
     if not txn_id:
         return None
 
-    # Idempotency key for deduplication
     idempotency_key = f"stripe_{evt_type}_{txn_id}"
 
-    # Timestamp
     created = obj.get("created", event.get("created"))
-    occurred_at = datetime.fromtimestamp(created) if created else datetime.utcnow()
+    occurred_at = datetime.fromtimestamp(created, tz=UTC) if created else datetime.now(UTC)
 
-    # Amount & currency
     amount = obj.get("amount", 0)
     currency = obj.get("currency", "usd").upper()
-
-    # Status
     status = STATUS_MAP.get(obj.get("status", "succeeded"), "succeeded")
-
-    # Customer
     customer_id = obj.get("customer")
 
-    # Decline code
     decline_code = None
     if txn_type == "charge" and status == "failed":
         decline_code = obj.get("failure_code")
 
-    # Card details
     risk_level = obj.get("outcome", {}).get("risk_level", "normal")
-
-    # Dispute
     dispute_id = obj.get("dispute")
-
-    # Description
     description = obj.get("description") or obj.get("statement_descriptor") or ""
-
-    # Metadata
     metadata = obj.get("metadata", {})
 
-    # Net amount & fees (Stripe standard: 2.9% + 30¢)
     fee_amount = 0
     if txn_type == "charge" and status == "succeeded":
         fee_amount = int(amount * 0.029 + 30)
@@ -279,6 +258,7 @@ def normalize_stripe_event(event: dict, stripe_account_id: str) -> dict | None:
     else:
         net_amount = amount
 
+    now = datetime.now(UTC)
     base = {
         "transaction_id": txn_id,
         "idempotency_key": idempotency_key,
@@ -305,9 +285,9 @@ def normalize_stripe_event(event: dict, stripe_account_id: str) -> dict | None:
         "dispute_status": None,
         "is_recurring": False,
         "description": description,
-        "metadata_json": str(metadata).replace("'", '"'),
-        "ingested_at": datetime.utcnow(),
-        "batch_id": f"stripe_webhook_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}",
+        "metadata_json": json.dumps(metadata),
+        "ingested_at": now,
+        "batch_id": f"stripe_webhook_{now.strftime('%Y%m%d_%H%M%S')}",
     }
     base.update(_date_fields(occurred_at))
     return base
@@ -322,11 +302,9 @@ def normalize_plaid_transaction(txn: dict, account_id: str) -> dict | None:
     """
     Normalize a Plaid transaction dict to unified schema.
     """
-    # Skip pending
     if txn.get("pending"):
         return None
 
-    # Plaid category mapping (simplified from ingest_plaid.py)
     PLAID_TO_INTERNAL = {
         "INCOME_WAGES": ("invoice_payment", "professional_services"),
         "INCOME_DIVIDENDS": ("charge", "investments"),
@@ -350,7 +328,6 @@ def normalize_plaid_transaction(txn: dict, account_id: str) -> dict | None:
     plaid_category = (txn.get("category") or ["UNCATEGORIZED"])[0]
     txn_type, product_line = PLAID_TO_INTERNAL.get(plaid_category, ("charge", "operations"))
 
-    # Amount: Plaid positive = debit (outflow), negative = credit (inflow)
     amount_cents = int(abs(txn.get("amount", 0) * 100))
     is_credit = txn.get("amount", 0) < 0
     net_amount = amount_cents if is_credit else -amount_cents
@@ -358,7 +335,9 @@ def normalize_plaid_transaction(txn: dict, account_id: str) -> dict | None:
     occurred_at = datetime.combine(
         datetime.strptime(txn.get("date"), "%Y-%m-%d").date(),
         datetime.min.time(),
+        tzinfo=UTC,
     )
+    now = datetime.now(UTC)
 
     base = {
         "transaction_id": f"plaid_{txn.get('transaction_id')}",
@@ -386,9 +365,9 @@ def normalize_plaid_transaction(txn: dict, account_id: str) -> dict | None:
         "dispute_status": None,
         "is_recurring": False,
         "description": txn.get("name") or txn.get("merchant_name") or "Bank transaction",
-        "metadata_json": f'{{"plaid_category": "{plaid_category}", "account_id": "{account_id}"}}',
-        "ingested_at": datetime.utcnow(),
-        "batch_id": f"plaid_webhook_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}",
+        "metadata_json": json.dumps({"plaid_category": plaid_category, "account_id": account_id}),
+        "ingested_at": now,
+        "batch_id": f"plaid_webhook_{now.strftime('%Y%m%d_%H%M%S')}",
     }
     base.update(_date_fields(occurred_at))
     return base

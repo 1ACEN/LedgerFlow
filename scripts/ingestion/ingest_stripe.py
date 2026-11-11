@@ -2,19 +2,19 @@
 """
 LedgerFlow: Stripe Ingestion Script (Batch Mode)
 
-Fetches recent events from Stripe API and writes normalized transactions to DuckDB.
+Fetches recent events from Stripe API and writes normalized transactions to PostgreSQL.
 Designed to run as a nightly cron job.
 
 Usage:
-    python scripts/ingestion/ingest_stripe.py --db data/ledgerflow.duckdb --days 1
+    python -m scripts.ingestion.ingest_stripe --days 1
 """
+
+from __future__ import annotations
 
 import argparse
 import os
-from datetime import datetime, timedelta
-from pathlib import Path
+from datetime import UTC, datetime, timedelta
 
-import duckdb  # noqa: F401 (kept for direct use if needed)
 import stripe
 from dotenv import load_dotenv
 from rich.console import Console
@@ -69,14 +69,19 @@ def fetch_events(client: stripe.StripeClient, start: datetime, end: datetime) ->
 
 def main():
     parser = argparse.ArgumentParser(description="Ingest Stripe events to LedgerFlow")
-    parser.add_argument("--db", type=Path, default=Path("data/ledgerflow.duckdb"))
+    parser.add_argument(
+        "--db-url",
+        dest="db_url",
+        default=None,
+        help="PostgreSQL connection URL (defaults to DATABASE_URL)",
+    )
     parser.add_argument("--days", type=int, default=1, help="Days of history to fetch")
     parser.add_argument("--dry-run", action="store_true", help="Fetch but don't write")
     args = parser.parse_args()
 
     console.rule("[bold blue]LedgerFlow Stripe Ingestion[/bold blue]")
 
-    end = datetime.utcnow()
+    end = datetime.now(UTC)
     start = end - timedelta(days=args.days)
 
     client = get_stripe_client()
@@ -84,7 +89,6 @@ def main():
 
     transactions = []
     for event in events:
-        # Convert stripe Event object to plain dict for normalize_stripe_event
         event_dict = event.to_dict() if hasattr(event, "to_dict") else dict(event)
         normalized = normalize_stripe_event(event_dict, STRIPE_ACCOUNT_ID)
         if normalized:
@@ -101,8 +105,10 @@ def main():
         return
 
     if transactions:
-        count = upsert_transactions(transactions, args.db)
-        console.log(f"[green][OK][/green] Written to DuckDB. Total Stripe transactions: {count}")
+        count = upsert_transactions(transactions, args.db_url)
+        console.log(
+            f"[green][OK][/green] Written to PostgreSQL. Total Stripe transactions: {count}"
+        )
     else:
         console.log("[yellow]No new transactions to write[/yellow]")
 

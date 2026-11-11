@@ -17,7 +17,6 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-import duckdb
 import numpy as np
 import polars as pl
 from faker import Faker
@@ -431,51 +430,60 @@ def generate_transactions(
     return df
 
 
-def write_to_duckdb(df: pl.DataFrame, db_path: Path) -> None:
+def write_to_postgres(
+    transactions: pl.DataFrame,
+    customers: pl.DataFrame,
+    merchants: pl.DataFrame,
+    db_url: str | None = None,
+    *,
+    parquet_dir: Path | None = Path("data/transactions"),
+    reset: bool = True,
+) -> None:
     """
-    Write generated transactions DataFrame to DuckDB and also save partitioned Parquet files.
-    Ensures all views, indexes, and full schema are present.
+    Initialize PostgreSQL schema and bulk-load generated transactions, customers, and merchants.
+    Also optionally writes partitioned Parquet files for analytical backup.
     """
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-
-    # Write partitioned by month
-    parquet_dir = db_path.parent / "transactions"
-    if parquet_dir.exists():
+    if parquet_dir is not None:
+        parquet_dir.mkdir(parents=True, exist_ok=True)
         shutil.rmtree(parquet_dir, ignore_errors=True)
-    df.write_parquet(
-        parquet_dir,
-        partition_by=["occurred_year", "occurred_month"],
-        compression="zstd",
-    )
+        transactions.write_parquet(
+            parquet_dir,
+            partition_by=["occurred_year", "occurred_month"],
+            compression="zstd",
+        )
 
+    from scripts.db.connection import (
+        copy_upsert_dataframe,
+        normalize_database_url,
+        open_direct_conn,
+    )
     from scripts.db.init_db import SCHEMA_SQL
     from scripts.ingestion.common import _INSERT_COLS
 
-    if db_path.exists():
-        db_path.unlink()
-    wal_path = Path(str(db_path) + ".wal")
-    if wal_path.exists():
-        wal_path.unlink()
+    url = normalize_database_url(db_url)
+    conn = open_direct_conn(url)
+    try:
+        conn.execute(SCHEMA_SQL)
 
-    conn = duckdb.connect(str(db_path))
+        if reset:
+            conn.execute("TRUNCATE TABLE transactions, customers, merchants RESTART IDENTITY")
 
-    # Initialize full schema (tables, views, indexes, generated columns)
-    conn.execute(SCHEMA_SQL)
+        copy_upsert_dataframe(conn, "customers", customers, conflict_cols=["customer_id"])
+        copy_upsert_dataframe(conn, "merchants", merchants, conflict_cols=["merchant_account_id"])
 
-    # Insert into transactions using non-generated columns directly from DataFrame
-    col_str = ", ".join(_INSERT_COLS)
-    conn.register("df_staging", df)
-    conn.execute(f"""
-        INSERT OR IGNORE INTO transactions ({col_str})
-        SELECT {col_str} FROM df_staging
-        ORDER BY occurred_at;
-    """)
+        tx_insert = transactions.select(_INSERT_COLS).sort("occurred_at")
+        copy_upsert_dataframe(
+            conn,
+            "transactions",
+            tx_insert,
+            conflict_cols=["transaction_id"],
+            do_nothing=True,
+        )
 
-    # Verify
-    count = conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
-    console.log(f"[green][OK][/green] Written {count:,} transactions to {db_path}")
-
-    conn.close()
+        count = conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
+        console.log(f"[green][OK][/green] Written {count:,} transactions to PostgreSQL")
+    finally:
+        conn.close()
 
 
 def main():
@@ -485,7 +493,16 @@ def main():
     )
     parser.add_argument("--days", type=int, default=365, help="Days of history to generate")
     parser.add_argument(
-        "--output", type=Path, default=Path("data/ledgerflow.duckdb"), help="Output DuckDB path"
+        "--db-url",
+        dest="db_url",
+        default=None,
+        help="PostgreSQL connection URL (defaults to DATABASE_URL env var)",
+    )
+    parser.add_argument(
+        "--parquet-dir",
+        type=Path,
+        default=Path("data/transactions"),
+        help="Optional Parquet export directory",
     )
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
     args = parser.parse_args()
@@ -501,32 +518,27 @@ def main():
 
     console.rule("[bold blue]LedgerFlow Synthetic Data Generator[/bold blue]")
 
-    # Generate dimensions
     console.log("Generating customer dimension...")
     customers = generate_customers(N_CUSTOMERS)
 
     console.log("Generating merchant accounts...")
     merchants = generate_merchant_accounts(N_MERCHANT_ACCOUNTS)
 
-    # Generate facts
     transactions = generate_transactions(args.rows, start_date, end_date, customers, merchants)
 
-    # Write to DuckDB
-    write_to_duckdb(transactions, args.output)
-
-    # Also write dimension tables
-    conn = duckdb.connect(str(args.output))
-    conn.register("customers_df", customers)
-    conn.execute("CREATE OR REPLACE TABLE customers AS SELECT * FROM customers_df")
-    conn.register("merchants_df", merchants)
-    conn.execute("CREATE OR REPLACE TABLE merchants AS SELECT * FROM merchants_df")
-    conn.close()
+    write_to_postgres(
+        transactions,
+        customers,
+        merchants,
+        db_url=args.db_url,
+        parquet_dir=args.parquet_dir,
+    )
 
     console.rule("[bold green]Done![/bold green]")
-    console.log(f"Database: {args.output}")
+    console.log("Database:     PostgreSQL")
     console.log(f"Transactions: {len(transactions):,}")
-    console.log(f"Customers: {len(customers):,}")
-    console.log(f"Merchants: {len(merchants):,}")
+    console.log(f"Customers:    {len(customers):,}")
+    console.log(f"Merchants:    {len(merchants):,}")
 
 
 if __name__ == "__main__":

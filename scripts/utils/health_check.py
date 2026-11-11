@@ -1,29 +1,34 @@
 #!/usr/bin/env python3
 """
-LedgerFlow: Health Check Script
+LedgerFlow: Health Check Script (PostgreSQL)
 
 Runs every 15 minutes via cron to verify system health.
 Exits with non-zero code if any check fails (triggers alerting).
 
 Usage:
-    python scripts/health_check.py --db data/ledgerflow.duckdb
+    python -m scripts.utils.health_check
 """
 
+from __future__ import annotations
+
 import argparse
+import shutil
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
-import duckdb
 from rich.console import Console
+
+from scripts.db.connection import normalize_database_url, open_direct_conn
 
 console = Console()
 
 
-def check_data_freshness(conn: duckdb.DuckDBPyConnection, max_age_hours: int = 48) -> bool:
+def check_data_freshness(conn: Any, max_age_hours: int = 48) -> bool:
     """Check that we have recent transaction data."""
     result = conn.execute("""
-        SELECT MAX(occurred_at) as latest FROM transactions
+        SELECT MAX(occurred_at) AS latest FROM transactions
     """).fetchone()
 
     if not result or result[0] is None:
@@ -51,7 +56,7 @@ def check_data_freshness(conn: duckdb.DuckDBPyConnection, max_age_hours: int = 4
     return True
 
 
-def check_table_counts(conn: duckdb.DuckDBPyConnection) -> bool:
+def check_table_counts(conn: Any) -> bool:
     """Verify core tables have data."""
     tables = [
         ("transactions", 100),
@@ -88,15 +93,15 @@ def check_model_files(model_path: Path) -> bool:
     return all_ok
 
 
-def check_forecast_freshness(conn: duckdb.DuckDBPyConnection, max_age_hours: int = 24) -> bool:
+def check_forecast_freshness(conn: Any, max_age_hours: int = 24) -> bool:
     """Check that forecasts were generated recently."""
     result = conn.execute("""
-        SELECT MAX(forecast_date) as latest FROM ml.cash_flow_forecast
+        SELECT MAX(forecast_date) AS latest FROM ml.cash_flow_forecast
     """).fetchone()
 
     if not result or result[0] is None:
         console.log("[yellow]WARN[/yellow]: No forecasts found (may be first run)")
-        return True  # Not a hard failure
+        return True
 
     latest = result[0]
     now_date = datetime.now(UTC).date()
@@ -113,10 +118,8 @@ def check_forecast_freshness(conn: duckdb.DuckDBPyConnection, max_age_hours: int
 
 def check_disk_space(min_gb: float = 1.0) -> bool:
     """Check available disk space."""
-    import shutil
-
     data_dir = Path("/data") if Path("/data").exists() else Path.cwd()
-    total, used, free = shutil.disk_usage(data_dir)
+    _total, _used, free = shutil.disk_usage(data_dir)
     free_gb = free / (1024**3)
 
     if free_gb < min_gb:
@@ -129,42 +132,37 @@ def check_disk_space(min_gb: float = 1.0) -> bool:
 
 def main():
     parser = argparse.ArgumentParser(description="LedgerFlow health check")
-    parser.add_argument("--db", type=Path, default=Path("data/ledgerflow.duckdb"))
+    parser.add_argument(
+        "--db-url",
+        dest="db_url",
+        default=None,
+        help="PostgreSQL connection URL (defaults to DATABASE_URL)",
+    )
     parser.add_argument("--model-path", type=Path, default=Path("models"))
     args = parser.parse_args()
 
     console.log(f"Running health check at {datetime.now(UTC).isoformat()}")
 
-    checks = []
+    checks = [check_disk_space()]
 
-    # Disk space
-    checks.append(check_disk_space())
-
-    # Database checks
-    if args.db.exists():
-        conn = duckdb.connect(str(args.db), read_only=True)
-        checks.append(check_table_counts(conn))
-        checks.append(check_data_freshness(conn))
-        checks.append(check_forecast_freshness(conn))
-        conn.close()
-    else:
-        console.log(f"[red]FAIL[/red]: Database not found at {args.db}")
+    try:
+        conn = open_direct_conn(normalize_database_url(args.db_url))
+        try:
+            checks.append(check_table_counts(conn))
+            checks.append(check_data_freshness(conn))
+            checks.append(check_forecast_freshness(conn))
+        finally:
+            conn.close()
+    except Exception as e:
+        console.log(f"[red]FAIL[/red]: PostgreSQL connection failed: {e}")
         checks.append(False)
 
-    # Model files
     checks.append(check_model_files(args.model_path))
 
-    # Summary
-    passed = sum(checks)
+    passed = sum(1 for c in checks if c)
     total = len(checks)
-
-    console.log(f"\nHealth check: {passed}/{total} passed")
-
-    if passed == total:
-        console.log("[green]All checks passed[/green]")
-        sys.exit(0)
-    else:
-        console.log("[red]Some checks failed[/red]")
+    console.log(f"Health summary: {passed}/{total} checks passed")
+    if not all(checks):
         sys.exit(1)
 
 

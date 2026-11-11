@@ -2,16 +2,17 @@
 """
 LedgerFlow: Plaid Bank Feed Ingestion (Batch Mode)
 
-Fetches transactions from Plaid (bank feeds) and writes normalized transactions to DuckDB.
+Fetches transactions from Plaid (bank feeds) and writes normalized transactions to PostgreSQL.
 Designed to run as a nightly cron job.
 
 Usage:
-    python scripts/ingest_plaid.py --db data/ledgerflow.duckdb --days 1
+    python -m scripts.ingestion.ingest_plaid --days 1
 """
+
+from __future__ import annotations
 
 import argparse
 import os
-from pathlib import Path
 
 import plaid
 from plaid.api import plaid_api
@@ -53,7 +54,7 @@ def get_access_tokens() -> list[str]:
     return [t.strip() for t in tokens.split(",") if t.strip()]
 
 
-def fetch_transactions(client: plaid_api.PlaidApi, access_token: str, cursor: str = None) -> list:
+def fetch_transactions(client: plaid_api.PlaidApi, access_token: str, cursor: str | None = None):
     """Fetch all transactions for an access token using /transactions/sync."""
     all_transactions = []
     has_more = True
@@ -68,21 +69,25 @@ def fetch_transactions(client: plaid_api.PlaidApi, access_token: str, cursor: st
         response = client.transactions_sync(request)
         all_transactions.extend(response.added)
         all_transactions.extend(response.modified)
-        # Note: removed transactions would need deletion logic
         has_more = response.has_more
         current_cursor = response.next_cursor
 
     return all_transactions, current_cursor
 
 
-def write_to_duckdb(transactions: list[dict], db_path: Path) -> int:
-    """Upsert transactions into DuckDB using shared function."""
-    return upsert_transactions(transactions, db_path)
+def write_to_db(transactions: list[dict], db_url: str | None = None) -> int:
+    """Upsert transactions into PostgreSQL using shared function."""
+    return upsert_transactions(transactions, db_url)
 
 
 def main():
     parser = argparse.ArgumentParser(description="Ingest Plaid bank transactions to LedgerFlow")
-    parser.add_argument("--db", type=Path, default=Path("data/ledgerflow.duckdb"))
+    parser.add_argument(
+        "--db-url",
+        dest="db_url",
+        default=None,
+        help="PostgreSQL connection URL (defaults to DATABASE_URL)",
+    )
     parser.add_argument(
         "--days", type=int, default=1, help="Days of history to fetch (Plaid sync is incremental)"
     )
@@ -103,7 +108,7 @@ def main():
     all_transactions = []
     for token in access_tokens:
         try:
-            txns, cursor = fetch_transactions(client, token)
+            txns, _cursor = fetch_transactions(client, token)
             console.log(f"  Fetched {len(txns)} transactions from token {token[:8]}...")
 
             for txn in txns:
@@ -124,8 +129,8 @@ def main():
         return
 
     if all_transactions:
-        count = write_to_duckdb(all_transactions, args.db)
-        console.log(f"[green][OK][/green] Written to DuckDB. Total Plaid transactions: {count}")
+        count = write_to_db(all_transactions, args.db_url)
+        console.log(f"[green][OK][/green] Written to PostgreSQL. Total Plaid transactions: {count}")
     else:
         console.log("[yellow]No new transactions to write[/yellow]")
 
