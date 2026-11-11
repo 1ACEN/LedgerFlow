@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Unit tests for LedgerFlow authentication endpoints and DuckDB user database.
+Unit tests for LedgerFlow authentication endpoints and PostgreSQL user database.
 """
 
-import duckdb
+import uuid
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -18,7 +19,7 @@ from scripts.api.webhooks import app
 
 
 class TestAuthDB:
-    """Test DuckDB user management and PBKDF2 hashing."""
+    """Test PostgreSQL user management and PBKDF2 hashing."""
 
     def test_password_hashing_and_verification(self):
         pwd = "secure_password_123"
@@ -30,32 +31,30 @@ class TestAuthDB:
         assert verify_password(pwd, salt, pwd_hash) is True
         assert verify_password("wrong_password", salt, pwd_hash) is False
 
-    def test_init_users_table_and_defaults(self):
-        conn = duckdb.connect(":memory:")
-        init_users_table(conn)
+    def test_init_users_table_and_defaults(self, pg_conn):
+        init_users_table(pg_conn)
 
-        count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        count = pg_conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
         assert count == 5  # admin, executive, cfo, ops, credit
 
-        admin = authenticate_user(conn, "admin", "admin")
+        admin = authenticate_user(pg_conn, "admin", "admin")
         assert admin is not None
         assert admin["username"] == "admin"
         assert admin["roleId"] == "admin"
 
-        cfo = authenticate_user(conn, "cfo", "cfo")
+        cfo = authenticate_user(pg_conn, "cfo", "cfo")
         assert cfo is not None
         assert cfo["username"] == "cfo"
         assert cfo["roleId"] == "cfo"
 
-        wrong = authenticate_user(conn, "admin", "wrongpassword")
+        wrong = authenticate_user(pg_conn, "admin", "wrongpassword")
         assert wrong is None
 
-    def test_register_new_user(self):
-        conn = duckdb.connect(":memory:")
-        init_users_table(conn)
+    def test_register_new_user(self, pg_conn):
+        init_users_table(pg_conn)
 
         user, err = register_user(
-            conn,
+            pg_conn,
             username="alex_analyst",
             password="mypassword123",
             full_name="Alex River",
@@ -68,13 +67,13 @@ class TestAuthDB:
         assert user["displayName"] == "Alex River"
 
         # Verify authentication works for the newly registered user
-        auth_res = authenticate_user(conn, "alex_analyst", "mypassword123")
+        auth_res = authenticate_user(pg_conn, "alex_analyst", "mypassword123")
         assert auth_res is not None
         assert auth_res["username"] == "alex_analyst"
 
         # Duplicate username should fail
         dup_user, dup_err = register_user(
-            conn,
+            pg_conn,
             username="alex_analyst",
             password="anotherpassword",
             full_name="Alex Duplicate",
@@ -88,7 +87,8 @@ class TestAuthAPIEndpoints:
     """Test FastAPI authentication endpoints."""
 
     @pytest.fixture(autouse=True)
-    def setup_client(self):
+    def setup_client(self, pg_test_url, monkeypatch):
+        monkeypatch.setattr("scripts.api.webhooks.DATABASE_URL", pg_test_url)
         self.client = TestClient(app)
 
     def test_api_roles_endpoint(self):
@@ -120,8 +120,6 @@ class TestAuthAPIEndpoints:
         assert res.status_code == 401
 
     def test_api_signup_flow(self):
-        import uuid
-
         unique_name = f"user_{uuid.uuid4().hex[:6]}"
         res = self.client.post(
             "/api/auth/signup",

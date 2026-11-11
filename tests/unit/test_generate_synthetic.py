@@ -4,15 +4,16 @@ Unit tests for synthetic data generation.
 """
 
 import tempfile
+from datetime import datetime
 from pathlib import Path
 
-import duckdb
 import pytest
 
 from scripts.utils.generate_synthetic import (
     generate_customers,
     generate_merchant_accounts,
     generate_transactions,
+    write_to_postgres,
 )
 
 
@@ -84,44 +85,38 @@ class TestGenerateSynthetic:
         if len(fees) > 0:
             assert (fees["net_amount"] < 0).all()
 
-    def test_write_to_duckdb(self):
-        """Integration test: write to DuckDB and read back."""
+    def test_write_to_postgres(self, pg_test_url, pg_conn):
+        """Integration test: write to PostgreSQL and verify counts and Parquet backup."""
         customers = generate_customers(10)
         merchants = generate_merchant_accounts(2)
-        start = __import__("datetime").datetime(2024, 1, 1)
-        end = __import__("datetime").datetime(2024, 1, 2)
+        start = datetime(2024, 1, 1)
+        end = datetime(2024, 1, 2)
         transactions = generate_transactions(50, start, end, customers, merchants)
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            db_path = Path(tmpdir) / "test.duckdb"
-
-            # Use the same write logic as the main script
-            conn = duckdb.connect(str(db_path))
-
-            transactions.write_parquet(
-                Path(tmpdir) / "transactions",
-                partition_by=["occurred_year", "occurred_month"],
-                compression="zstd",
+            parquet_dir = Path(tmpdir) / "transactions"
+            write_to_postgres(
+                transactions,
+                customers,
+                merchants,
+                db_url=pg_test_url,
+                parquet_dir=parquet_dir,
             )
 
-            parquet_glob = (Path(tmpdir) / "transactions" / "**" / "*.parquet").as_posix()
-            conn.execute(f"""
-                CREATE OR REPLACE VIEW transactions AS
-                SELECT * FROM read_parquet('{parquet_glob}')
-                ORDER BY occurred_at;
-            """)
-
-            count = conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
+            count = pg_conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
             assert count == 50
+            assert list(parquet_dir.rglob("*.parquet"))
 
             # Check derived columns exist
-            cols = conn.execute("DESCRIBE transactions").fetchall()
+            cols = pg_conn.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'transactions'
+            """).fetchall()
             col_names = [c[0] for c in cols]
             assert "amount_usd" in col_names
             assert "net_amount_usd" in col_names
             assert "is_recurring" in col_names
-
-            conn.close()
 
 
 if __name__ == "__main__":

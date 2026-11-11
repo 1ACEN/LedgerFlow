@@ -3,16 +3,12 @@
 Unit tests for live data input, normalization, and webhooks API endpoints.
 """
 
-import tempfile
-from datetime import datetime
-from pathlib import Path
+from datetime import UTC, datetime
 
-import duckdb
 import pytest
 from fastapi.testclient import TestClient
 
 from scripts.api.webhooks import app
-from scripts.db.init_db import SCHEMA_SQL
 from scripts.ingestion.common import (
     _date_fields,
     normalize_plaid_transaction,
@@ -122,68 +118,55 @@ class TestLiveInput:
         assert cred_norm is not None
         assert cred_norm["net_amount"] == 120000  # positive inflow in cents
 
-    def test_upsert_transactions_deduplication(self):
+    def test_upsert_transactions_deduplication(self, pg_test_url, pg_conn):
         """Test that upserting duplicate transactions updates rather than duplicates."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            db_path = Path(tmpdir) / "test.duckdb"
+        now = datetime.now(UTC)
+        txn = {
+            "transaction_id": "test_txn_uniq_01",
+            "idempotency_key": "test_idem_uniq_01",
+            "occurred_at": now,
+            "posted_at": now,
+            "type": "charge",
+            "status": "succeeded",
+            "source": "manual",
+            "amount": 5000,
+            "currency": "USD",
+            "fx_rate": 1.0,
+            "net_amount": 4825,
+            "fee_amount": 175,
+            "product_line": "subscriptions",
+            "basis": "cash",
+            "description": "Initial charge",
+            "ingested_at": now,
+            "batch_id": "batch_01",
+        }
+        txn.update(_date_fields(now))
 
-            conn = duckdb.connect(str(db_path))
-            conn.execute(SCHEMA_SQL)
-            conn.close()
+        # First insert
+        count1 = upsert_transactions([txn], pg_test_url)
+        assert count1 == 1
 
-            now = datetime.utcnow()
-            txn = {
-                "transaction_id": "test_txn_uniq_01",
-                "idempotency_key": "test_idem_uniq_01",
-                "occurred_at": now,
-                "posted_at": now,
-                "type": "charge",
-                "status": "succeeded",
-                "source": "manual",
-                "amount": 5000,
-                "currency": "USD",
-                "fx_rate": 1.0,
-                "net_amount": 4825,
-                "fee_amount": 175,
-                "product_line": "subscriptions",
-                "basis": "cash",
-                "description": "Initial charge",
-                "ingested_at": now,
-                "batch_id": "batch_01",
-            }
-            txn.update(_date_fields(now))
+        # Update status and re-insert
+        txn["status"] = "refunded"
+        count2 = upsert_transactions([txn], pg_test_url)
+        assert count2 == 1  # Total count unchanged
 
-            # First insert
-            count1 = upsert_transactions([txn], db_path)
-            assert count1 == 1
+        # Verify in DB
+        row = pg_conn.execute(
+            "SELECT status, amount_usd, net_amount_usd FROM transactions WHERE transaction_id = 'test_txn_uniq_01'"
+        ).fetchone()
 
-            # Update status and re-insert
-            txn["status"] = "refunded"
-            count2 = upsert_transactions([txn], db_path)
-            assert count2 == 1  # Total count unchanged
-
-            # Verify in DB
-            conn = duckdb.connect(str(db_path))
-            row = conn.execute(
-                "SELECT status, amount_usd, net_amount_usd FROM transactions WHERE transaction_id = 'test_txn_uniq_01'"
-            ).fetchone()
-            conn.close()
-
-            assert row[0] == "refunded"
-            assert row[1] == 50.0
-            assert row[2] == 48.25
+        assert row[0] == "refunded"
+        assert row[1] == 50.0
+        assert row[2] == 48.25
 
 
 class TestAPIEndpoints:
     """Tests for FastAPI live data and webhook endpoints."""
 
     @pytest.fixture
-    def client(self, tmp_path, monkeypatch):
-        db_path = tmp_path / "test.duckdb"
-        conn = duckdb.connect(str(db_path))
-        conn.execute(SCHEMA_SQL)
-        conn.close()
-        monkeypatch.setattr("scripts.api.webhooks.DUCKDB_PATH", db_path)
+    def client(self, pg_test_url, monkeypatch):
+        monkeypatch.setattr("scripts.api.webhooks.DATABASE_URL", pg_test_url)
         return TestClient(app)
 
     def test_health_endpoint(self, client):
