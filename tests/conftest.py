@@ -62,4 +62,3 @@ def pg_conn(pg_test_url: str) -> Iterator[psycopg.Connection]:
         yield conn
     finally:
         conn.close()
-
