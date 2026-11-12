@@ -183,17 +183,19 @@ def generate_transactions(
                 days_back = random.uniform(min(90.0, total_span_days), total_span_days)
             oa = end_date - timedelta(days=days_back)
         else:
-            # Steady linear business volume growth: p(u) ~ 1 + 0.35 * u, u in [0, 1]
-            # Inverted CDF avoids small initial month and provides smooth MoM growth
+            # Steady linear business volume growth: p(u) ~ 1 + k * u, u in [0, 1]
+            # Exact inverted CDF spans full [0, 1] up to end_date with smooth MoM growth
+            k = 0.35
             r = random.random()
-            u = (-1.0 + (1.0 + 0.7 * r) ** 0.5) / 0.35
+            u = (-1.0 + (1.0 + k * (2.0 + k) * r) ** 0.5) / k
             oa = start_date + timedelta(seconds=u * total_span_sec)
         occurred_ats.append(oa)
 
-    # Posted date is 0-2 days after occurred
+    # Posted date is 0-2 days after occurred (mostly same-day / next-day), clamped to end_date
+    settlement_lags = np.random.choice([0, 1, 2], n_rows, p=[0.75, 0.20, 0.05])
     posted_ats = [
-        oa + timedelta(days=random.randint(0, 2), hours=random.randint(0, 23))
-        for oa in occurred_ats
+        min(end_date, oa + timedelta(days=int(lag), hours=random.randint(0, 12)))
+        for oa, lag in zip(occurred_ats, settlement_lags, strict=False)
     ]
 
     # Status depends on type

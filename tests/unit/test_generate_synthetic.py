@@ -85,6 +85,29 @@ class TestGenerateSynthetic:
         if len(fees) > 0:
             assert (fees["net_amount"] < 0).all()
 
+    def test_generate_transactions_balanced_across_full_range(self):
+        """Ensure non-invoice transactions cover the full date range up to end_date without tail gaps."""
+        import random
+
+        import numpy as np
+
+        random.seed(42)
+        np.random.seed(42)
+
+        customers = generate_customers(10)
+        merchants = generate_merchant_accounts(2)
+        start = datetime(2025, 11, 1, 0, 0, 0)
+        end = datetime(2026, 11, 12, 23, 59, 59)
+
+        txns = generate_transactions(5000, start, end, customers, merchants)
+        charges = txns.filter(txns["type"] == "charge")
+
+        # Final 30 days should have balanced volume (at least 6% of charges, not 0%)
+        cutoff = datetime(2026, 10, 13, 0, 0, 0)
+        recent_charges = charges.filter(charges["occurred_at"] >= cutoff)
+        assert len(recent_charges) > len(charges) * 0.06
+        assert txns["posted_at"].max() <= end
+
     def test_write_to_postgres(self, pg_test_url, pg_conn):
         """Integration test: write to PostgreSQL and verify counts and Parquet backup."""
         customers = generate_customers(10)

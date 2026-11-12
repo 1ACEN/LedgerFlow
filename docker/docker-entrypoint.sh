@@ -26,7 +26,7 @@ if [ -n "$DATABASE_URL" ]; then
         TXN_COUNT=$(python -c "from scripts.db.connection import open_direct_conn; c=open_direct_conn(); print(c.execute('SELECT COUNT(*) FROM transactions').fetchone()[0]); c.close()" 2>/dev/null || echo "0")
         if [ "${TXN_COUNT:-0}" = "0" ]; then
             echo "Transactions table is empty — generating initial seed transactions..."
-            python -m scripts.utils.generate_synthetic --rows 2000 || true
+            python -m scripts.utils.generate_synthetic --rows 20000 || true
         else
             echo "PostgreSQL already contains ${TXN_COUNT} transactions — skipping synthetic seed."
         fi

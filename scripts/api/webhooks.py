@@ -199,12 +199,20 @@ async def shutdown_event():
 # DEMO STREAM
 # =============================================================================
 
-_DEMO_TYPES = ["charge", "charge", "charge", "refund", "payout", "fee", "invoice_payment"]
-_DEMO_STATUSES_WEIGHTED = {
-    "succeeded": 80,
-    "failed": 12,
-    "pending": 5,
-    "canceled": 3,
+_DEMO_TYPES_WEIGHTED = {
+    "charge": 60,
+    "fee": 12,
+    "payout": 10,
+    "refund": 7,
+    "invoice_payment": 5,
+    "transfer": 4,
+    "adjustment": 2,
+}
+_DEMO_CHARGE_STATUSES = {
+    "succeeded": 92,
+    "failed": 5,
+    "pending": 2,
+    "canceled": 1,
 }
 _DEMO_SOURCES = ["stripe", "stripe", "stripe", "plaid", "ach"]
 _DEMO_PRODUCTS = [
@@ -231,30 +239,51 @@ def _weighted_choice(d: dict) -> str:
 
 
 def _build_demo_transaction() -> dict:
-    """Generate one realistic synthetic transaction."""
-    txn_type = random.choice(_DEMO_TYPES)
-    status = _weighted_choice(_DEMO_STATUSES_WEIGHTED)
+    """Generate one realistic synthetic transaction aligned with historical distributions."""
+    txn_type = _weighted_choice(_DEMO_TYPES_WEIGHTED)
+    if txn_type in ("payout", "transfer", "fee"):
+        status = "succeeded"
+    elif txn_type == "refund":
+        status = "succeeded" if random.random() < 0.97 else "failed"
+    else:
+        status = _weighted_choice(_DEMO_CHARGE_STATUSES)
+
     source = random.choice(_DEMO_SOURCES)
     product_line = random.choice(_DEMO_PRODUCTS)
-    amount_cents = random.randint(500, 250_000)  # $5 – $2500
     now = datetime.now(UTC)
+
+    # Calibrated per-type amounts so live streaming blends smoothly with historical daily bars
+    if txn_type == "fee":
+        amount_cents = random.randint(30, 1500)  # $0.30 - $15.00
+    elif txn_type == "refund":
+        amount_cents = int(min(max(random.lognormvariate(8.3, 0.8), 500), 25_000))  # ~$40 avg
+    elif txn_type == "payout":
+        amount_cents = int(min(max(random.lognormvariate(9.2, 0.9), 1000), 60_000))  # ~$100 avg
+    else:
+        amount_cents = int(min(max(random.lognormvariate(8.8, 0.9), 200), 100_000))  # ~$66 median
 
     fee_amount = 0
     if txn_type == "charge" and status == "succeeded":
-        fee_amount = int(amount_cents * 0.029 + 30)
-    elif txn_type == "refund":
-        fee_amount = -int(amount_cents * 0.029)
+        fee_amount = min(int(amount_cents * 0.029 + 30), amount_cents)
+    elif txn_type == "fee":
+        fee_amount = amount_cents
+    elif txn_type == "payout":
+        fee_amount = random.choice([0, 25, 100, 250])
 
-    # Net amount: positive for charges, negative for outflows (payout, refund, fee)
+    # Net amount: positive for inflows, negative for outflows (payout, refund, fee, debit adjustments)
     if txn_type in ("refund", "payout", "fee"):
         net_amount = -amount_cents
+    elif txn_type == "transfer":
+        net_amount = -amount_cents if random.random() < 0.6 else amount_cents
+    elif txn_type == "adjustment":
+        net_amount = -amount_cents if random.random() < 0.5 else amount_cents
     elif txn_type == "charge" and status == "succeeded":
         net_amount = amount_cents - fee_amount
     else:
         net_amount = amount_cents
 
     decline_code = None
-    if status == "failed" and txn_type == "charge":
+    if status == "failed" and txn_type in ("charge", "invoice_payment"):
         decline_code = random.choice(_DEMO_DECLINES)
 
     account_code_map = {
@@ -280,14 +309,16 @@ def _build_demo_transaction() -> dict:
         desc = f"Refund — {product_line.replace('_', ' ').title()}"
     elif txn_type == "fee":
         desc = f"Payment Processing Fee — {source.upper()}"
+    elif txn_type == "transfer":
+        desc = "Treasury bank sweep — acct_001"
     else:
         desc = f"Demo {txn_type} — {product_line.replace('_', ' ').title()}"
 
     # Payouts and fees are primarily cash movements
-    if txn_type in ("payout", "refund", "fee"):
+    if txn_type in ("payout", "fee"):
         basis = "cash" if random.random() < 0.85 else "accrual"
     else:
-        basis = random.choice(["cash", "accrual"])
+        basis = "cash" if random.random() < 0.70 else "accrual"
 
     row = {
         "transaction_id": f"demo_{uuid.uuid4().hex[:16]}",
@@ -305,7 +336,7 @@ def _build_demo_transaction() -> dict:
         "amount_usd": amount_cents / 100.0,
         "net_amount_usd": net_amount / 100.0,
         "fee_amount_usd": fee_amount / 100.0,
-        "customer_id": f"cus_{uuid.uuid4().hex[:10]}",
+        "customer_id": f"cus_{random.randint(1, 2000):06d}",
         "merchant_account_id": STRIPE_ACCOUNT_ID,
         "product_line": product_line,
         "department": "engineering",

@@ -102,8 +102,15 @@ def prepare_latest_features(conn: Any, feature_cols: list) -> tuple[np.ndarray, 
     latest = df.tail(1)
     X = latest.select(feature_cols).to_numpy()
 
-    # Also get current cash position
-    current_cash = latest["cumulative_cash_usd"].item()
+    # Fetch true all-time cumulative cash position so forecast connects seamlessly to history
+    pos_row = conn.execute(
+        "SELECT cumulative_cash_usd FROM analytics.daily_cash_position ORDER BY date DESC LIMIT 1"
+    ).fetchone()
+    current_cash = (
+        float(pos_row[0])
+        if pos_row and pos_row[0] is not None
+        else float(latest["cumulative_cash_usd"].item())
+    )
     last_date = latest["posted_date"].item()
 
     console.log(f"Last data date: {last_date}, Current cash: ${current_cash:,.2f}")
