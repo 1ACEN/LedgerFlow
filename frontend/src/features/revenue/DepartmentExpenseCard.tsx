@@ -1,5 +1,6 @@
 import { fmt_usd } from '../../lib/api';
 import type { DepartmentExpense } from './useRevenue';
+import { useCrossFilter } from '../../lib/CrossFilterContext';
 
 interface DepartmentExpenseCardProps {
   expenses: DepartmentExpense[];
@@ -10,15 +11,29 @@ export const DepartmentExpenseCard = ({
   expenses,
   totalOpex,
 }: DepartmentExpenseCardProps) => {
+  const { filters, toggleFilter } = useCrossFilter();
+  const selectedDept = filters.department;
+
   return (
     <div className="card animate-in stagger-3" style={{ height: '100%' }}>
-      <div className="card-header">
+      <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <span className="card-title">Operating Expense Breakdown by Function</span>
           <span className="card-subtitle" style={{ display: 'block' }}>
             Attribution across department cost centers for headcount planning and spend optimization
           </span>
         </div>
+        <span
+          style={{
+            fontSize: 10,
+            color: 'var(--text-muted)',
+            border: '1px dashed var(--border-color)',
+            padding: '2px 6px',
+            borderRadius: 4,
+          }}
+        >
+          Click row to filter
+        </span>
       </div>
 
       <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -32,17 +47,46 @@ export const DepartmentExpenseCard = ({
             </div>
           </div>
           <span className="badge-pill med" style={{ fontSize: 10 }}>
-            Cost Centers Active
+            {selectedDept ? `Filtering: ${selectedDept.toUpperCase()}` : 'Cost Centers Active'}
           </span>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {expenses.map((dept) => {
+            const isSelected = selectedDept === dept.key;
+            const isAnySelected = !!selectedDept;
+            const opacity = isAnySelected && !isSelected ? 0.38 : 1.0;
+
             return (
-              <div key={dept.key} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <div
+                key={dept.key}
+                onClick={() => toggleFilter('department', dept.key)}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 5,
+                  padding: '8px 10px',
+                  borderRadius: 'var(--radius-sm, 6px)',
+                  background: isSelected ? 'var(--accent-soft)' : 'transparent',
+                  border: isSelected ? '1px solid var(--accent)' : '1px solid transparent',
+                  cursor: 'pointer',
+                  opacity,
+                  transition: 'all 0.18s ease',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSelected) {
+                    (e.currentTarget as HTMLElement).style.background = 'var(--bg-secondary)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isSelected) {
+                    (e.currentTarget as HTMLElement).style.background = 'transparent';
+                  }
+                }}
+              >
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                  <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {dept.department}
+                  <span style={{ fontWeight: 600, color: isSelected ? 'var(--accent)' : 'var(--text-primary)' }}>
+                    {isSelected ? '✓ ' : ''}{dept.department}
                   </span>
                   <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontFamily: "'JetBrains Mono', monospace" }}>
                     {fmt_usd(dept.amount_usd)}
@@ -64,7 +108,9 @@ export const DepartmentExpenseCard = ({
                     style={{
                       width: `${Math.min(100, dept.percentage)}%`,
                       height: '100%',
-                      background: 'linear-gradient(90deg, #f43f5e 0%, #fb7185 100%)',
+                      background: isSelected
+                        ? 'var(--accent)'
+                        : 'linear-gradient(90deg, #f43f5e 0%, #fb7185 100%)',
                       borderRadius: 3,
                     }}
                   />
@@ -73,23 +119,7 @@ export const DepartmentExpenseCard = ({
             );
           })}
         </div>
-
-        <div
-          style={{
-            marginTop: 6,
-            padding: '10px 14px',
-            background: 'var(--surface-subtle)',
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--border-subtle)',
-            fontSize: 11.5,
-            color: 'var(--text-secondary)',
-            lineHeight: 1.45,
-          }}
-        >
-          <strong style={{ color: 'var(--text-primary)' }}>CFO Optimization Insight:</strong> R&amp;D and Sales represent ~54% of operating cash outflows. Current headcount efficiency and capital discipline remain comfortably within targeted payback benchmarks.
-        </div>
       </div>
     </div>
   );
 };
-

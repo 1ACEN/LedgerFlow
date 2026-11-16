@@ -1,25 +1,56 @@
 import { useMemo } from 'react';
 import type { ChartConfiguration, TooltipItem } from 'chart.js';
-import ChartBox from '../../components/charts/ChartBox';
+import ChartBox, { type ChartClickInfo } from '../../components/charts/ChartBox';
 import { fmt_usd } from '../../lib/api';
 import { computeProductTotals, type RevenueRow } from './useRevenue';
+import { useCrossFilter } from '../../lib/CrossFilterContext';
+import { dimColor } from '../../lib/crossFilterUtils';
 
 interface Props {
   rows: RevenueRow[];
 }
 
 const MIX_COLORS = [
-  'rgba(59, 130, 246, 0.9)',
-  'rgba(16, 185, 129, 0.9)',
-  'rgba(245, 158, 11, 0.9)',
-  'rgba(139, 92, 246, 0.9)',
-  'rgba(14, 165, 233, 0.9)',
-  'rgba(249, 115, 22, 0.9)',
+  'rgba(59, 130, 246, 0.95)',
+  'rgba(16, 185, 129, 0.95)',
+  'rgba(245, 158, 11, 0.95)',
+  'rgba(139, 92, 246, 0.95)',
+  'rgba(14, 165, 233, 0.95)',
+  'rgba(249, 115, 22, 0.95)',
 ];
 
 export default function RevenueMixChart({ rows }: Props) {
-  const config = useMemo<ChartConfiguration>(() => {
-    const products = computeProductTotals(rows);
+  const { filters, toggleFilter } = useCrossFilter();
+
+  // If a month is selected, compute product mix strictly for that month
+  const activeRows = useMemo(() => {
+    if (filters.month) {
+      const match = rows.filter((r) => r.month.slice(0, 7) === filters.month);
+      return match.length > 0 ? match : rows;
+    }
+    return rows;
+  }, [rows, filters.month]);
+
+  const products = useMemo(() => computeProductTotals(activeRows), [activeRows]);
+
+  const config = useMemo<ChartConfiguration<'doughnut'>>(() => {
+    const isProductFiltered = !!filters.productLine;
+
+    const backgroundColors = products.map((p, i) => {
+      const baseColor = MIX_COLORS[i % MIX_COLORS.length];
+      if (!isProductFiltered) return baseColor;
+      return p.productLine === filters.productLine ? baseColor : dimColor(baseColor, 0.22);
+    });
+
+    const borderColors = products.map((p) => {
+      if (!isProductFiltered) return '#121827';
+      return p.productLine === filters.productLine ? '#ffffff' : 'rgba(255, 255, 255, 0.08)';
+    });
+
+    const borderWidths = products.map((p) => {
+      if (!isProductFiltered) return 2;
+      return p.productLine === filters.productLine ? 3 : 1;
+    });
 
     return {
       type: 'doughnut',
@@ -28,10 +59,10 @@ export default function RevenueMixChart({ rows }: Props) {
         datasets: [
           {
             data: products.map((p) => p.total),
-            backgroundColor: products.map((_, i) => MIX_COLORS[i % MIX_COLORS.length]),
-            borderColor: '#121827',
-            borderWidth: 2,
-            hoverOffset: 6,
+            backgroundColor: backgroundColors,
+            borderColor: borderColors,
+            borderWidth: borderWidths,
+            hoverOffset: 8,
           },
         ],
       },
@@ -62,16 +93,37 @@ export default function RevenueMixChart({ rows }: Props) {
         },
       },
     };
-  }, [rows]);
+  }, [products, filters.productLine]);
+
+  const handleElementClick = (info: ChartClickInfo) => {
+    if (info && products[info.index]) {
+      toggleFilter('productLine', products[info.index].productLine);
+    }
+  };
 
   return (
     <div className="card animate-in stagger-2">
-      <div className="card-header">
-        <span className="card-title">Product Line Revenue Mix</span>
-        <span className="card-subtitle">TTM dollar &amp; share breakdown</span>
+      <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <span className="card-title">Product Line Revenue Mix</span>
+          <span className="card-subtitle" style={{ display: 'block' }}>
+            {filters.month ? `Month ${filters.month} breakdown` : 'TTM dollar & share breakdown'}
+          </span>
+        </div>
+        <span
+          style={{
+            fontSize: 10,
+            color: 'var(--text-muted)',
+            border: '1px dashed var(--border-color)',
+            padding: '2px 6px',
+            borderRadius: 4,
+          }}
+        >
+          Click slice to cross-filter
+        </span>
       </div>
       <div className="card-body">
-        <ChartBox config={config} />
+        <ChartBox config={config} onElementClick={handleElementClick} />
       </div>
     </div>
   );

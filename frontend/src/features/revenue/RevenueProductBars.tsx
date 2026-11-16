@@ -1,42 +1,66 @@
 import { useMemo } from 'react';
 import type { ChartConfiguration, TooltipItem } from 'chart.js';
-import ChartBox from '../../components/charts/ChartBox';
+import ChartBox, { type ChartClickInfo } from '../../components/charts/ChartBox';
 import { fmt_usd } from '../../lib/api';
 import { formatProductLine, type RevenueRow } from './useRevenue';
+import { useCrossFilter } from '../../lib/CrossFilterContext';
+import { dimColor } from '../../lib/crossFilterUtils';
 
 interface Props {
   rows: RevenueRow[];
 }
 
 const PRODUCT_COLORS = [
-  'rgba(59,130,246,0.85)',  // subscriptions (blue)
-  'rgba(16,185,129,0.85)',  // services (green)
-  'rgba(245,158,11,0.85)',  // marketplace (yellow)
-  'rgba(139,92,246,0.85)',  // ecommerce (purple)
-  'rgba(6,182,212,0.85)',   // platform fees (cyan)
-  'rgba(249,115,22,0.85)',  // extra (orange)
+  'rgba(59,130,246,0.92)',  // subscriptions (blue)
+  'rgba(16,185,129,0.92)',  // services (green)
+  'rgba(245,158,11,0.92)',  // marketplace (yellow)
+  'rgba(139,92,246,0.92)',  // ecommerce (purple)
+  'rgba(6,182,212,0.92)',   // platform fees (cyan)
+  'rgba(249,115,22,0.92)',  // extra (orange)
 ];
 
 export default function RevenueProductBars({ rows }: Props) {
-  const config = useMemo<ChartConfiguration>(() => {
+  const { filters, toggleFilter } = useCrossFilter();
+
+  const { months, products, datasets } = useMemo(() => {
     const monthSet = new Set<string>();
     const prodSet = new Set<string>();
     for (const r of rows) {
       monthSet.add(r.month);
       prodSet.add(r.product_line);
     }
-    const months = Array.from(monthSet).sort();
-    const products = Array.from(prodSet).sort();
+    const sortedMonths = Array.from(monthSet).sort();
+    const sortedProducts = Array.from(prodSet).sort();
 
-    const datasets = products.map((prod, i) => {
-      const data = months.map((m) => {
+    const isProdFiltered = !!filters.productLine;
+    const isMonthFiltered = !!filters.month;
+
+    const builtDatasets = sortedProducts.map((prod, i) => {
+      const isThisProd = prod === filters.productLine;
+      const baseColor = PRODUCT_COLORS[i % PRODUCT_COLORS.length];
+      const data = sortedMonths.map((m) => {
         const match = rows.find((r) => r.month === m && r.product_line === prod);
         return match ? match.revenue : 0;
       });
+
+      // Power BI-style highlighting: per-bar color adjustment for both month and product
+      const backgroundColors = sortedMonths.map((m) => {
+        const isThisMonth = m.slice(0, 7) === filters.month;
+        if (isProdFiltered && !isThisProd) {
+          return dimColor(baseColor, 0.18);
+        }
+        if (isMonthFiltered && !isThisMonth) {
+          return dimColor(baseColor, 0.28);
+        }
+        return baseColor;
+      });
+
       return {
         label: formatProductLine(prod),
         data,
-        backgroundColor: PRODUCT_COLORS[i % PRODUCT_COLORS.length],
+        backgroundColor: backgroundColors,
+        borderColor: isProdFiltered && isThisProd ? '#ffffff' : 'transparent',
+        borderWidth: isProdFiltered && isThisProd ? 1.5 : 0,
         borderRadius: 4,
         borderSkipped: false,
         stack: 'total',
@@ -44,9 +68,20 @@ export default function RevenueProductBars({ rows }: Props) {
     });
 
     return {
+      months: sortedMonths,
+      products: sortedProducts,
+      datasets: builtDatasets,
+    };
+  }, [rows, filters.productLine, filters.month]);
+
+  const config = useMemo<ChartConfiguration<'bar'>>(() => {
+    return {
       type: 'bar',
       data: {
-        labels: months.map((m) => m.slice(0, 7)),
+        labels: months.map((m) => {
+          const shortMonth = m.slice(0, 7);
+          return shortMonth === filters.month ? `▶ ${shortMonth}` : shortMonth;
+        }),
         datasets,
       },
       options: {
@@ -74,7 +109,13 @@ export default function RevenueProductBars({ rows }: Props) {
           x: {
             stacked: true,
             grid: { display: false },
-            ticks: { color: '#6b7fa0', font: { size: 10 } },
+            ticks: {
+              color: (ctx) => {
+                const label = months[ctx.index]?.slice(0, 7);
+                return label === filters.month ? '#60a5fa' : '#6b7fa0';
+              },
+              font: { size: 10, weight: 600 },
+            },
             border: { display: false },
           },
           y: {
@@ -93,16 +134,44 @@ export default function RevenueProductBars({ rows }: Props) {
         },
       },
     };
-  }, [rows]);
+  }, [months, datasets, filters.month]);
+
+  const handleElementClick = (info: ChartClickInfo) => {
+    // If clicked on a bar: toggle the month
+    if (info && months[info.index]) {
+      const selectedMonth = months[info.index].slice(0, 7);
+      // If datasetIndex is valid, also allow toggling product if user clicks a specific stack
+      if (products[info.datasetIndex] && filters.month === selectedMonth) {
+        toggleFilter('productLine', products[info.datasetIndex]);
+      } else {
+        toggleFilter('month', selectedMonth);
+      }
+    }
+  };
 
   return (
-    <div className="card animate-in stagger-2">
-      <div className="card-header">
-        <span className="card-title">Monthly Revenue by Product Line</span>
-        <span className="card-subtitle">stacked gross revenue across lines</span>
+    <div className="card animate-in stagger-1">
+      <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <span className="card-title">Monthly Revenue by Product Line</span>
+          <span className="card-subtitle" style={{ display: 'block' }}>
+            MoM stacked volume progression across revenue channels
+          </span>
+        </div>
+        <span
+          style={{
+            fontSize: 10,
+            color: 'var(--text-muted)',
+            border: '1px dashed var(--border-color)',
+            padding: '2px 6px',
+            borderRadius: 4,
+          }}
+        >
+          Click bar to filter month
+        </span>
       </div>
       <div className="card-body">
-        <ChartBox config={config} />
+        <ChartBox config={config} onElementClick={handleElementClick} />
       </div>
     </div>
   );

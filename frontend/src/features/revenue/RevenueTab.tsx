@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useRevenue } from './useRevenue';
+import { useState, useMemo } from 'react';
+import { useRevenue, computeRevenueKpis } from './useRevenue';
 import RevenueKpiStrip from './RevenueKpiStrip';
 import { FinancialPerformanceTrendsChart } from './FinancialPerformanceTrendsChart';
 import { BudgetVsActualCard } from './BudgetVsActualCard';
@@ -9,6 +9,8 @@ import { DebtCapitalStructureCard } from './DebtCapitalStructureCard';
 import RevenueProductBars from './RevenueProductBars';
 import RevenueMixChart from './RevenueMixChart';
 import IncomeStatementTable from './IncomeStatementTable';
+import { CrossFilterProvider, useCrossFilter } from '../../lib/CrossFilterContext';
+import ActiveFiltersBar from '../../components/ActiveFiltersBar';
 
 interface Props {
   refreshKey?: number;
@@ -16,9 +18,30 @@ interface Props {
 
 type TabFocus = 'all' | 'performance' | 'segmentation' | 'budget' | 'products';
 
-export default function RevenueTab({ refreshKey }: Props) {
+function RevenueTabContent({ refreshKey }: Props) {
   const { data, kpis, loading, error, refetch } = useRevenue(refreshKey);
   const [activeFocus, setActiveFocus] = useState<TabFocus>('all');
+  const { filters, hasActiveFilters } = useCrossFilter();
+
+  const rows = data?.revenue_by_product || [];
+
+  // Cross-filtered rows
+  const filteredRows = useMemo(() => {
+    if (!hasActiveFilters || rows.length === 0) return rows;
+    return rows.filter((r) => {
+      if (filters.month && r.month.slice(0, 7) !== filters.month) return false;
+      if (filters.productLine && r.product_line !== filters.productLine) return false;
+      return true;
+    });
+  }, [rows, filters.month, filters.productLine, hasActiveFilters]);
+
+  // Dynamically recalibrate KPIs when filtered
+  const activeKpis = useMemo(() => {
+    if (hasActiveFilters && filteredRows.length > 0) {
+      return computeRevenueKpis(filteredRows, data);
+    }
+    return kpis;
+  }, [hasActiveFilters, filteredRows, kpis, data]);
 
   if (error) {
     return (
@@ -49,8 +72,6 @@ export default function RevenueTab({ refreshKey }: Props) {
       </div>
     );
   }
-
-  const rows = data?.revenue_by_product || [];
 
   return (
     <div
@@ -149,8 +170,11 @@ export default function RevenueTab({ refreshKey }: Props) {
         </div>
       </div>
 
+      {/* Active Cross-Filters Ribbon */}
+      <ActiveFiltersBar />
+
       {/* 1. Strategic Financial Intelligence KPI Strip */}
-      <RevenueKpiStrip kpis={kpis} loading={loading} />
+      <RevenueKpiStrip kpis={activeKpis} loading={loading} />
 
       {/* 2. Financial Performance Trends & Budget vs Actual Performance */}
       {(activeFocus === 'all' || activeFocus === 'performance') && (
@@ -162,8 +186,8 @@ export default function RevenueTab({ refreshKey }: Props) {
             alignItems: 'stretch',
           }}
         >
-          <FinancialPerformanceTrendsChart trends={kpis.performanceTrends} />
-          <BudgetVsActualCard items={kpis.budgetVsActual} />
+          <FinancialPerformanceTrendsChart trends={activeKpis.performanceTrends} />
+          <BudgetVsActualCard items={activeKpis.budgetVsActual} />
         </div>
       )}
 
@@ -178,12 +202,12 @@ export default function RevenueTab({ refreshKey }: Props) {
           }}
         >
           <CustomerSegmentationCard
-            tiers={kpis.customerTiers}
-            topCustomers={kpis.topCustomers}
+            tiers={activeKpis.customerTiers}
+            topCustomers={activeKpis.topCustomers}
           />
           <DepartmentExpenseCard
-            expenses={kpis.expensesByDept}
-            totalOpex={kpis.operatingExpenses}
+            expenses={activeKpis.expensesByDept}
+            totalOpex={activeKpis.operatingExpenses}
           />
         </div>
       )}
@@ -191,8 +215,8 @@ export default function RevenueTab({ refreshKey }: Props) {
       {/* 4. Debt Management & Forward Strategic Guidance */}
       {(activeFocus === 'all' || activeFocus === 'performance') && (
         <DebtCapitalStructureCard
-          debt={kpis.debtStructure}
-          forecasting={kpis.forecasting}
+          debt={activeKpis.debtStructure}
+          forecasting={activeKpis.forecasting}
         />
       )}
 
@@ -215,5 +239,13 @@ export default function RevenueTab({ refreshKey }: Props) {
         <IncomeStatementTable rows={rows} />
       )}
     </div>
+  );
+}
+
+export default function RevenueTab(props: Props) {
+  return (
+    <CrossFilterProvider>
+      <RevenueTabContent {...props} />
+    </CrossFilterProvider>
   );
 }
