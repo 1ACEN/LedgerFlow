@@ -2,6 +2,8 @@ import React, { useMemo } from 'react';
 import type { ChartConfiguration } from 'chart.js';
 import ChartBox from '../../components/charts/ChartBox';
 import type { CashTrendPoint } from './useExecutive';
+import { useCrossFilter } from '../../lib/CrossFilterContext';
+import { dimColor } from '../../lib/crossFilterUtils';
 
 interface DailyFlowsChartProps {
   trend: CashTrendPoint[];
@@ -26,20 +28,55 @@ function fmtUsdFull(v: number): string {
 }
 
 export const DailyFlowsChart: React.FC<DailyFlowsChartProps> = ({ trend }) => {
+  const { filters, toggleFilter } = useCrossFilter();
+
   const chartConfig = useMemo<ChartConfiguration<'bar'>>(() => {
-    const labels = trend.map(pt => pt.date.slice(5)); // 'MM-DD'
-    const inflows = trend.map(pt => pt.inflows);
-    const outflows = trend.map(pt => pt.outflows);
+    const inflows = trend.map((pt) => pt.inflows);
+    const outflows = trend.map((pt) => pt.outflows);
+
+    const isDateFiltered = !!filters.date;
+    const isMonthFiltered = !!filters.month && !isDateFiltered;
+
+    const inflowColors = trend.map((pt) => {
+      if (isDateFiltered) {
+        return pt.date === filters.date
+          ? 'rgba(59, 130, 246, 1)'
+          : dimColor('rgba(59, 130, 246, 0.75)', 0.2);
+      }
+      if (isMonthFiltered) {
+        return pt.date.startsWith(filters.month!)
+          ? 'rgba(59, 130, 246, 0.95)'
+          : dimColor('rgba(59, 130, 246, 0.75)', 0.25);
+      }
+      return 'rgba(59, 130, 246, 0.75)';
+    });
+
+    const outflowColors = trend.map((pt) => {
+      if (isDateFiltered) {
+        return pt.date === filters.date
+          ? 'rgba(239, 68, 68, 1)'
+          : dimColor('rgba(239, 68, 68, 0.65)', 0.2);
+      }
+      if (isMonthFiltered) {
+        return pt.date.startsWith(filters.month!)
+          ? 'rgba(239, 68, 68, 0.85)'
+          : dimColor('rgba(239, 68, 68, 0.65)', 0.25);
+      }
+      return 'rgba(239, 68, 68, 0.65)';
+    });
 
     return {
       type: 'bar',
       data: {
-        labels,
+        labels: trend.map((pt) => {
+          const short = pt.date.slice(5);
+          return pt.date === filters.date ? `▶ ${short}` : short;
+        }),
         datasets: [
           {
             label: 'Inflows',
             data: inflows,
-            backgroundColor: 'rgba(59, 130, 246, 0.75)',
+            backgroundColor: inflowColors,
             hoverBackgroundColor: 'rgba(59, 130, 246, 0.95)',
             borderRadius: 4,
             borderSkipped: false,
@@ -48,7 +85,7 @@ export const DailyFlowsChart: React.FC<DailyFlowsChartProps> = ({ trend }) => {
           {
             label: 'Outflows',
             data: outflows,
-            backgroundColor: 'rgba(239, 68, 68, 0.65)',
+            backgroundColor: outflowColors,
             hoverBackgroundColor: 'rgba(239, 68, 68, 0.85)',
             borderRadius: 4,
             borderSkipped: false,
@@ -79,7 +116,7 @@ export const DailyFlowsChart: React.FC<DailyFlowsChartProps> = ({ trend }) => {
             callbacks: {
               title: (items) => {
                 const idx = items[0]?.dataIndex ?? 0;
-                return `Date: ${trend[idx]?.date || ''}`;
+                return `Date: ${trend[idx]?.date || ''} (Click to filter)`;
               },
               label: (ctx) => `${ctx.dataset.label}: ${fmtUsdFull(ctx.parsed.y ?? 0)}`,
             },
@@ -103,21 +140,39 @@ export const DailyFlowsChart: React.FC<DailyFlowsChartProps> = ({ trend }) => {
         },
       },
     };
-  }, [trend]);
+  }, [trend, filters.date, filters.month]);
 
   return (
-    <div className="card animate-in stagger-4">
-      <div className="card-header">
+    <div className="card animate-in stagger-3" style={{ height: '100%' }}>
+      <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <span className="card-title">Daily Inflows vs Outflows</span>
           <span className="card-subtitle" style={{ display: 'block' }}>
-            Daily cash flow volatility and net operational variance
+            Daily cash flow volatility and net operational variance (Click bar to cross-filter)
           </span>
         </div>
+        {filters.date && (
+          <button
+            className="filter-reset-btn"
+            onClick={() => toggleFilter('date', filters.date!)}
+            title="Clear date filter"
+            style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4 }}
+          >
+            {filters.date} ✕
+          </button>
+        )}
       </div>
       <div className="card-body">
-        <div className="chart-box">
-          <ChartBox config={chartConfig} />
+        <div className="chart-box" style={{ height: 260, cursor: 'pointer' }}>
+          <ChartBox
+            config={chartConfig}
+            onElementClick={(info) => {
+              const clickedDate = trend[info.index]?.date;
+              if (clickedDate) {
+                toggleFilter('date', clickedDate);
+              }
+            }}
+          />
         </div>
       </div>
     </div>

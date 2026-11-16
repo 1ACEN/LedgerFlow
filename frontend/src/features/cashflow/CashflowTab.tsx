@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useCashflow } from './useCashflow';
 import CashflowKpiStrip from './CashflowKpiStrip';
 import { ActualVsForecastChart } from './ActualVsForecastChart';
@@ -7,6 +7,8 @@ import { MonthlyQuarterlyTrendsCard } from './MonthlyQuarterlyTrendsCard';
 import { ScenarioMatrixCard } from './ScenarioMatrixCard';
 import WeeklyFlowChart from './WeeklyFlowChart';
 import WeeklyFlowTable from './WeeklyFlowTable';
+import { CrossFilterProvider, useCrossFilter } from '../../lib/CrossFilterContext';
+import ActiveFiltersBar from '../../components/ActiveFiltersBar';
 
 interface Props {
   refreshKey?: number;
@@ -14,9 +16,30 @@ interface Props {
 
 type TabFocus = 'all' | 'forecast' | 'breakdown' | 'trends';
 
-export default function CashflowTab({ refreshKey }: Props) {
+function CashflowTabContent({ refreshKey }: Props) {
   const { data, kpis, loading, error, refetch } = useCashflow(refreshKey);
+  const { filters } = useCrossFilter();
   const [activeFocus, setActiveFocus] = useState<TabFocus>('all');
+
+  // Dynamic KPI calculations when month filter is active
+  const activeKpis = useMemo(() => {
+    if (!kpis) return kpis;
+    let dynamic = { ...kpis };
+
+    if (filters.month) {
+      const monthRow = kpis.monthlyTrends.find((m) => m.period === filters.month);
+      if (monthRow) {
+        dynamic = {
+          ...dynamic,
+          inflows30d: monthRow.inflows,
+          outflows30d: monthRow.outflows,
+          netCashFlow30d: monthRow.net_flow,
+          currentReserves: monthRow.ending_cash,
+        };
+      }
+    }
+    return dynamic;
+  }, [kpis, filters.month]);
 
   if (error) {
     return (
@@ -54,9 +77,10 @@ export default function CashflowTab({ refreshKey }: Props) {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 22,
+        gap: 20,
         maxWidth: 1560,
         margin: '0 auto',
+        width: '100%',
       }}
     >
       {/* Analytical Data Intelligence Header */}
@@ -145,8 +169,11 @@ export default function CashflowTab({ refreshKey }: Props) {
         </div>
       </div>
 
+      {/* Power BI Interactive Active Filters Bar */}
+      <ActiveFiltersBar />
+
       {/* 1. Analytical Intelligence KPI Strip */}
-      <CashflowKpiStrip kpis={kpis} loading={loading} />
+      <CashflowKpiStrip kpis={activeKpis} loading={loading} />
 
       {/* 2. Actual vs. Forecast Cash Flow Trajectory */}
       {(activeFocus === 'all' || activeFocus === 'forecast') && (
@@ -166,7 +193,7 @@ export default function CashflowTab({ refreshKey }: Props) {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(460px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 460px), 1fr))',
             gap: 20,
             alignItems: 'stretch',
           }}
@@ -186,7 +213,7 @@ export default function CashflowTab({ refreshKey }: Props) {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(460px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 460px), 1fr))',
             gap: 20,
             alignItems: 'stretch',
           }}
@@ -199,5 +226,13 @@ export default function CashflowTab({ refreshKey }: Props) {
         </div>
       )}
     </div>
+  );
+}
+
+export default function CashflowTab(props: Props) {
+  return (
+    <CrossFilterProvider>
+      <CashflowTabContent {...props} />
+    </CrossFilterProvider>
   );
 }

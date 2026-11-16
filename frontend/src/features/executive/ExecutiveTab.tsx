@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useExecutive } from './useExecutive';
 import { ExecutiveSummaryBanner } from './ExecutiveSummaryBanner';
 import { ExecutiveKpiStrip } from './ExecutiveKpiStrip';
@@ -8,6 +8,8 @@ import { ExecutiveAlertsCard } from './ExecutiveAlertsCard';
 import { CashTrajectoryChart } from './CashTrajectoryChart';
 import { DailyFlowsChart } from './DailyFlowsChart';
 import { ExecutiveFlowsTable } from './ExecutiveFlowsTable';
+import { CrossFilterProvider, useCrossFilter } from '../../lib/CrossFilterContext';
+import ActiveFiltersBar from '../../components/ActiveFiltersBar';
 
 interface ExecutiveTabProps {
   refreshKey?: number;
@@ -15,9 +17,48 @@ interface ExecutiveTabProps {
 
 type DeepDiveView = 'all' | 'trajectory' | 'daily' | 'ledger';
 
-export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({ refreshKey }) => {
+const ExecutiveTabContent: React.FC<ExecutiveTabProps> = ({ refreshKey }) => {
   const { data, kpis, loading, error, refetch } = useExecutive(refreshKey);
+  const { filters } = useCrossFilter();
   const [deepDiveView, setDeepDiveView] = useState<DeepDiveView>('all');
+
+  const trend = data?.cash_trend || [];
+
+  // Dynamic KPI slice based on active cross-filter (Month or Date)
+  const activeKpis = useMemo(() => {
+    if (!kpis) return kpis;
+    let dynamic = { ...kpis };
+
+    if (filters.month) {
+      const point = kpis.monthlyComparison.find((p) => p.month === filters.month);
+      if (point) {
+        dynamic = {
+          ...dynamic,
+          totalRevenue30d: point.revenue,
+          totalExpenses30d: point.expenses,
+          netProfit30d: point.net_profit,
+          netMarginPct: point.margin_pct,
+        };
+      }
+    } else if (filters.date) {
+      const dayPoint = trend.find((p) => p.date === filters.date);
+      if (dayPoint) {
+        dynamic = {
+          ...dynamic,
+          totalRevenue30d: dayPoint.inflows,
+          totalExpenses30d: dayPoint.outflows,
+          netProfit30d: dayPoint.net,
+          currentCash: dayPoint.cash,
+          netMarginPct:
+            dayPoint.inflows > 0
+              ? Number(((dayPoint.net / dayPoint.inflows) * 100).toFixed(1))
+              : 0,
+        };
+      }
+    }
+
+    return dynamic;
+  }, [kpis, filters.month, filters.date, trend]);
 
   if (error) {
     return (
@@ -49,17 +90,16 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({ refreshKey }) => {
     );
   }
 
-  const trend = data?.cash_trend || [];
-
   return (
     <div
       className="executive-command-center"
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 22,
+        gap: 20,
         maxWidth: 1560,
         margin: '0 auto',
+        width: '100%',
       }}
     >
       {/* Executive Command Center Header Bar */}
@@ -116,11 +156,14 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({ refreshKey }) => {
         </div>
       </div>
 
+      {/* Power BI Interactive Active Filters Bar */}
+      <ActiveFiltersBar />
+
       {/* 1. Concise Executive Summary Briefing */}
-      <ExecutiveSummaryBanner kpis={kpis} />
+      <ExecutiveSummaryBanner kpis={activeKpis} />
 
       {/* 2. Four Large Hero Command Center KPI Cards */}
-      <ExecutiveKpiStrip kpis={kpis} loading={loading} />
+      <ExecutiveKpiStrip kpis={activeKpis} loading={loading} />
 
       {/* 3. Command Center Core Visualizations & Health Grid */}
       {loading ? (
@@ -136,7 +179,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({ refreshKey }) => {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(460px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 460px), 1fr))',
             gap: 20,
             alignItems: 'stretch',
           }}
@@ -148,7 +191,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({ refreshKey }) => {
 
           {/* Right Column: Stacked Financial Health & Decision Alerts */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20, minWidth: 0 }}>
-            <FinancialHealthRiskCard kpis={kpis} />
+            <FinancialHealthRiskCard kpis={activeKpis} />
             <ExecutiveAlertsCard alerts={kpis.alerts} />
           </div>
         </div>
@@ -215,7 +258,8 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({ refreshKey }) => {
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: deepDiveView === 'all' ? 'repeat(auto-fit, minmax(420px, 1fr))' : '1fr',
+                gridTemplateColumns:
+                  deepDiveView === 'all' ? 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))' : '1fr',
                 gap: 18,
               }}
             >
@@ -237,5 +281,13 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({ refreshKey }) => {
         </div>
       </div>
     </div>
+  );
+};
+
+export const ExecutiveTab: React.FC<ExecutiveTabProps> = (props) => {
+  return (
+    <CrossFilterProvider>
+      <ExecutiveTabContent {...props} />
+    </CrossFilterProvider>
   );
 };
