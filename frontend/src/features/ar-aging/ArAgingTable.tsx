@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { fmt_usd } from '../../lib/api';
 import { arSeverity, type ArAgingRow } from './useArAging';
+import { useCrossFilter } from '../../lib/CrossFilterContext';
 
 interface Props {
   aging: ArAgingRow[];
@@ -9,6 +10,7 @@ interface Props {
 type FilterBucket = 'all' | 'critical' | 'elevated' | 'moderate' | 'current';
 
 export default function ArAgingTable({ aging }: Props) {
+  const { filters } = useCrossFilter();
   const [searchTerm, setSearchTerm] = useState('');
   const [bucketFilter, setBucketFilter] = useState<FilterBucket>('all');
   const [pageSize, setPageSize] = useState<number>(25);
@@ -24,7 +26,20 @@ export default function ArAgingTable({ aging }: Props) {
   const filtered = useMemo(() => {
     let result = aging;
 
-    // Filter by bucket severity
+    // Power BI Cross-Filter by Aging Bucket if selected in ArBucketChart
+    if (filters.agingBucket) {
+      if (filters.agingBucket === 'current') {
+        result = result.filter((row) => row.current > 0);
+      } else if (filters.agingBucket === 'days_31_60') {
+        result = result.filter((row) => row.days_31_60 > 0);
+      } else if (filters.agingBucket === 'days_61_90') {
+        result = result.filter((row) => row.days_61_90 > 0);
+      } else if (filters.agingBucket === 'days_90_plus') {
+        result = result.filter((row) => row.days_90_plus > 0);
+      }
+    }
+
+    // Filter by bucket severity tab
     if (bucketFilter !== 'all') {
       result = result.filter((row) => arSeverity(row) === bucketFilter);
     }

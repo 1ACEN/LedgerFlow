@@ -6,6 +6,8 @@ import CollectionEfficiencyCard from './CollectionEfficiencyCard';
 import HighRiskAccountsCard from './HighRiskAccountsCard';
 import ArBucketChart from './ArBucketChart';
 import ArAgingTable from './ArAgingTable';
+import { CrossFilterProvider } from '../../lib/CrossFilterContext';
+import ActiveFiltersBar from '../../components/ActiveFiltersBar';
 
 interface Props {
   refreshKey?: number;
@@ -13,7 +15,7 @@ interface Props {
 
 type TabFocus = 'all' | 'buckets' | 'efficiency' | 'high_risk' | 'ledger';
 
-export default function ArAgingTab({ refreshKey }: Props) {
+function ArAgingTabContent({ refreshKey }: Props) {
   const { data, kpis, buckets, efficiency, highRisk, aging, loading, error, refetch } = useArAging(refreshKey);
   const [activeFocus, setActiveFocus] = useState<TabFocus>('all');
 
@@ -161,6 +163,9 @@ export default function ArAgingTab({ refreshKey }: Props) {
         </div>
       </div>
 
+      {/* Active Power BI Filters Bar */}
+      <ActiveFiltersBar />
+
       {/* 5-Card Command Strip */}
       {kpis && <ArKpiStrip summary={kpis} efficiency={efficiency} aging={aging} />}
 
@@ -227,3 +232,12 @@ export default function ArAgingTab({ refreshKey }: Props) {
     </div>
   );
 }
+
+export default function ArAgingTab(props: Props) {
+  return (
+    <CrossFilterProvider>
+      <ArAgingTabContent {...props} />
+    </CrossFilterProvider>
+  );
+}
+

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { RetryAdvisorRow } from './useOps';
+import { useCrossFilter } from '../../lib/CrossFilterContext';
 
 interface RetryAdvisorTableProps {
   rows: RetryAdvisorRow[];
@@ -18,13 +19,30 @@ function shortId(id: string): string {
   return id.length > 18 ? `${id.slice(0, 8)}…${id.slice(-6)}` : id;
 }
 
+function formatAction(action: string): string {
+  if (!action) return 'Standard Retry';
+  return action.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export const RetryAdvisorTable: React.FC<RetryAdvisorTableProps> = ({ rows }) => {
+  const { filters, toggleFilter } = useCrossFilter();
   const [minProb, setMinProb] = useState<number>(0);
 
   const filteredRows = useMemo(() => {
-    if (minProb === 0) return rows;
-    return rows.filter(r => r.probability >= minProb);
-  }, [rows, minProb]);
+    let result = rows;
+    if (minProb > 0) {
+      result = result.filter((r) => r.probability >= minProb);
+    }
+    if (filters.declineCode) {
+      result = result.filter(
+        (r) =>
+          r.decline_code?.toLowerCase() === filters.declineCode?.toLowerCase() ||
+          r.decline_code?.toLowerCase().replace(/_/g, ' ') ===
+            filters.declineCode?.toLowerCase().replace(/_/g, ' ')
+      );
+    }
+    return result;
+  }, [rows, minProb, filters.declineCode]);
 
   const totalFilteredRecovery = useMemo(() => {
     return filteredRows.reduce((sum, r) => sum + r.recovery_usd, 0);
@@ -34,17 +52,33 @@ export const RetryAdvisorTable: React.FC<RetryAdvisorTableProps> = ({ rows }) =>
     <div className="card animate-in stagger-3" style={{ marginBottom: 20 }}>
       <div
         className="card-header"
-        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 12,
+        }}
       >
         <div>
           <span className="card-title">AI Decline Retry Advisor (ML Smart Routing Recommendations)</span>
           <span className="card-subtitle" style={{ display: 'block' }}>
-            LightGBM model predictions for highest-yield payment recovery actions
+            LightGBM model predictions for highest-yield payment recovery actions (Click reason to filter)
           </span>
         </div>
 
         {/* Filter Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {filters.declineCode && (
+            <button
+              className="filter-reset-btn"
+              onClick={() => toggleFilter('declineCode', filters.declineCode!)}
+              style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4 }}
+            >
+              Reason: {filters.declineCode.replace(/_/g, ' ')} ✕
+            </button>
+          )}
+
           <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Filter probability:</span>
           <div className="filter-group">
             <button
@@ -70,8 +104,8 @@ export const RetryAdvisorTable: React.FC<RetryAdvisorTableProps> = ({ rows }) =>
       </div>
 
       <div className="card-body" style={{ padding: 0 }}>
-        <div className="table-container" style={{ maxHeight: 380 }}>
-          <table className="data-table">
+        <div className="table-container" style={{ maxHeight: 380, overflowX: 'auto' }}>
+          <table className="data-table" style={{ width: '100%', minWidth: 640 }}>
             <thead>
               <tr>
                 <th>Transaction ID</th>
@@ -95,46 +129,73 @@ export const RetryAdvisorTable: React.FC<RetryAdvisorTableProps> = ({ rows }) =>
                 filteredRows.map((row) => {
                   const pillClass =
                     row.probability >= 70 ? 'high' : row.probability >= 40 ? 'med' : 'low';
+                  const isSelected =
+                    filters.declineCode &&
+                    row.decline_code?.toLowerCase() === filters.declineCode?.toLowerCase();
 
                   return (
-                    <tr key={row.transaction_id}>
+                    <tr
+                      key={row.transaction_id}
+                      onClick={() => toggleFilter('declineCode', row.decline_code)}
+                      style={{
+                        cursor: 'pointer',
+                        background: isSelected ? 'var(--accent-soft, rgba(59, 130, 246, 0.14))' : undefined,
+                        borderLeft: isSelected ? '3px solid var(--accent, #3b82f6)' : '3px solid transparent',
+                        transition: 'background 0.15s ease',
+                      }}
+                      title="Click to toggle cross-filter for this decline reason"
+                    >
+                      <td style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+                        {shortId(row.transaction_id)}
+                      </td>
                       <td>
-                        <code
+                        <span
                           style={{
-                            fontFamily: "'JetBrains Mono', monospace",
-                            fontSize: 11,
-                            background: 'var(--accent-soft)',
-                            padding: '2px 6px',
-                            borderRadius: 4,
-                            color: 'var(--text-primary)',
+                            fontWeight: isSelected ? 800 : 600,
+                            color: isSelected ? 'var(--accent)' : 'var(--text-primary)',
                           }}
                         >
-                          {shortId(row.transaction_id)}
-                        </code>
+                          {isSelected ? `▶ ${row.decline_code.replace(/_/g, ' ')}` : row.decline_code.replace(/_/g, ' ')}
+                        </span>
                       </td>
-                      <td style={{ textTransform: 'capitalize' }}>
-                        {(row.decline_code || '—').replace(/_/g, ' ')}
+                      <td>{row.brand}</td>
+                      <td>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            textTransform: 'uppercase',
+                            padding: '2px 5px',
+                            borderRadius: 3,
+                            background: 'var(--pill-bg)',
+                            color: 'var(--text-secondary)',
+                          }}
+                        >
+                          {row.funding}
+                        </span>
                       </td>
-                      <td>{row.brand || '—'}</td>
-                      <td style={{ textTransform: 'capitalize' }}>{row.funding || '—'}</td>
                       <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                         {fmtUsd(row.amount_usd)}
                       </td>
                       <td style={{ textAlign: 'center' }}>
-                        <span className={`badge-pill ${pillClass}`} style={{ fontWeight: 600 }}>
-                          {row.probability}%
+                        <span className={`badge-pill ${pillClass}`} style={{ fontSize: 11, fontWeight: 700 }}>
+                          {row.probability.toFixed(0)}%
                         </span>
                       </td>
                       <td>
-                        <strong style={{ color: 'var(--text-primary)', textTransform: 'capitalize' }}>
-                          {(row.action || '—').replace(/_/g, ' ')}
-                        </strong>
+                        <span
+                          style={{
+                            fontWeight: 600,
+                            color: row.action === 'do_not_retry' ? 'var(--text-muted)' : 'var(--text-primary)',
+                          }}
+                        >
+                          {formatAction(row.action)}
+                        </span>
                       </td>
                       <td
                         style={{
                           textAlign: 'right',
-                          color: 'var(--green)',
                           fontWeight: 700,
+                          color: row.recovery_usd > 0 ? 'var(--green)' : 'var(--text-muted)',
                           fontVariantNumeric: 'tabular-nums',
                         }}
                       >
@@ -145,27 +206,30 @@ export const RetryAdvisorTable: React.FC<RetryAdvisorTableProps> = ({ rows }) =>
                 })
               )}
             </tbody>
-            {filteredRows.length > 0 && (
-              <tfoot>
-                <tr style={{ background: 'var(--table-th-bg)', borderTop: '1px solid var(--border)' }}>
-                  <td colSpan={7} style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
-                    Total Recoverable Pipeline ({filteredRows.length} transactions):
-                  </td>
-                  <td
-                    style={{
-                      textAlign: 'right',
-                      fontWeight: 700,
-                      color: 'var(--green)',
-                      fontSize: 13,
-                      fontVariantNumeric: 'tabular-nums',
-                    }}
-                  >
-                    {fmtUsd(totalFilteredRecovery)}
-                  </td>
-                </tr>
-              </tfoot>
-            )}
           </table>
+        </div>
+
+        <div
+          style={{
+            padding: '10px 16px',
+            borderTop: '1px solid var(--border)',
+            background: 'var(--surface-subtle)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            fontSize: 12,
+            color: 'var(--text-secondary)',
+            flexWrap: 'wrap',
+            gap: 8,
+          }}
+        >
+          <span>Showing {filteredRows.length} recommendations</span>
+          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+            Pipeline Expected Yield:{' '}
+            <span style={{ color: 'var(--green)', fontFamily: "'JetBrains Mono', monospace" }}>
+              {fmtUsd(totalFilteredRecovery)}
+            </span>
+          </span>
         </div>
       </div>
     </div>

@@ -9,6 +9,8 @@ import { DeclinesChart } from './DeclinesChart';
 import { SuccessTrendChart } from './SuccessTrendChart';
 import { RetryAdvisorTable } from './RetryAdvisorTable';
 import { DisputesTable } from './DisputesTable';
+import { CrossFilterProvider } from '../../lib/CrossFilterContext';
+import ActiveFiltersBar from '../../components/ActiveFiltersBar';
 
 interface OpsTabProps {
   refreshKey?: number;
@@ -16,7 +18,7 @@ interface OpsTabProps {
 
 type TabFocus = 'all' | 'anomalies' | 'gateways' | 'retries' | 'disputes';
 
-export const OpsTab = ({ refreshKey }: OpsTabProps) => {
+const OpsTabContent = ({ refreshKey }: OpsTabProps) => {
   const { data, kpis, loading, error, refetch } = useOps(refreshKey);
   const [activeFocus, setActiveFocus] = useState<TabFocus>('all');
 
@@ -61,9 +63,10 @@ export const OpsTab = ({ refreshKey }: OpsTabProps) => {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 22,
+        gap: 20,
         maxWidth: 1560,
         margin: '0 auto',
+        width: '100%',
       }}
     >
       {/* Modern AI Operations Console Header */}
@@ -159,6 +162,9 @@ export const OpsTab = ({ refreshKey }: OpsTabProps) => {
         </div>
       </div>
 
+      {/* Power BI Interactive Active Filters Bar */}
+      <ActiveFiltersBar />
+
       {/* 1. Modern AI Operations KPI Strip */}
       <OpsKpiStrip kpis={kpis} loading={loading} />
 
@@ -167,7 +173,7 @@ export const OpsTab = ({ refreshKey }: OpsTabProps) => {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(460px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 460px), 1fr))',
             gap: 20,
             alignItems: 'stretch',
           }}
@@ -186,7 +192,7 @@ export const OpsTab = ({ refreshKey }: OpsTabProps) => {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(460px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 460px), 1fr))',
             gap: 20,
             alignItems: 'stretch',
           }}
@@ -217,7 +223,7 @@ export const OpsTab = ({ refreshKey }: OpsTabProps) => {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(460px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 460px), 1fr))',
             gap: 20,
             alignItems: 'stretch',
           }}
@@ -237,5 +243,13 @@ export const OpsTab = ({ refreshKey }: OpsTabProps) => {
         <DisputesTable disputes={disputes} />
       )}
     </div>
+  );
+};
+
+export const OpsTab = (props: OpsTabProps) => {
+  return (
+    <CrossFilterProvider>
+      <OpsTabContent {...props} />
+    </CrossFilterProvider>
   );
 };
